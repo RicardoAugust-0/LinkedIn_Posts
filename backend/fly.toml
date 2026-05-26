@@ -1,0 +1,26 @@
+# fly.toml app configuration file for Fly.io deployment
+
+app = "" # Deixado em branco para o 'fly launch' solicitar o nome ao iniciar
+
+primary_region = "iad" # Região padrão: Virgínia (EUA)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[mounts]]
+  source = "posts_data"
+  destination = "/data"
+
+[env]
+  HOST = "0.0.0.0"
+  PORT = "3000"
+  DATABASE_URL = "sqlite:/data/posts.db"
+  FRONTEND_URL = "https://seu-app-frontend.vercel.app" # Ajuste após implantar o frontend na Vercel
