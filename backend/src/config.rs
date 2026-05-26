@@ -23,9 +23,15 @@ impl AppConfig {
 
         let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
         
-        let public_url = env::var("PUBLIC_URL").unwrap_or_else(|_| format!("http://localhost:{}", port));
+        let mut public_url = env::var("PUBLIC_URL").unwrap_or_else(|_| format!("http://localhost:{}", port));
+        if public_url.ends_with('/') {
+            public_url.pop();
+        }
 
-        let frontend_url = env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+        let mut frontend_url = env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+        if frontend_url.ends_with('/') {
+            frontend_url.pop();
+        }
 
         Self {
             database_url,
