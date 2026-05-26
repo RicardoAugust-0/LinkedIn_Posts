@@ -3,6 +3,7 @@
   import { Sparkles, Search, Image as ImageIcon, ArrowRight, ArrowLeft, Trash2 } from '@lucide/svelte';
   import ImageGrid from '../ImageGrid.svelte';
   import { postStore } from '../../lib/stores/postStore';
+  import { API_URL } from '../../lib/api';
 
   let activeMediaTab: 'search' | 'ai' | 'upload' = 'search';
 
@@ -19,7 +20,7 @@
     improvedContent = null;
     postStore.setError(null);
     try {
-      const res = await fetch('http://localhost:3000/api/generate/improve', {
+      const res = await fetch(`${API_URL}/api/generate/improve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -296,7 +297,7 @@
 
           {#if $postStore.generatedImageUrl}
             <div class="generated-preview-box">
-              <img src={$postStore.generatedImageUrl.startsWith('/uploads') ? `http://localhost:3000${$postStore.generatedImageUrl}` : $postStore.generatedImageUrl} alt="Gerada por IA" class="generated-preview-img" />
+              <img src={$postStore.generatedImageUrl.startsWith('/uploads') ? `${API_URL}${$postStore.generatedImageUrl}` : $postStore.generatedImageUrl} alt="Gerada por IA" class="generated-preview-img" />
               <div class="generated-badge-overlay">
                 <span class="badge-tag">gerada via Imagen 4</span>
               </div>
@@ -331,7 +332,7 @@
     <div class="media-panel-footer">
       <div class="media-footer-status">
         {#if $postStore.selectedImageUrl}
-          <img src={$postStore.selectedImageUrl.startsWith('/uploads') ? `http://localhost:3000${$postStore.selectedImageUrl}` : $postStore.selectedImageUrl} alt="Thumbnail selecionado" class="footer-thumb" />
+          <img src={$postStore.selectedImageUrl.startsWith('/uploads') ? `${API_URL}${$postStore.selectedImageUrl}` : $postStore.selectedImageUrl} alt="Thumbnail selecionado" class="footer-thumb" />
           <div class="footer-thumb-info">
             <div class="footer-thumb-title">1 imagem selecionada</div>
             <div class="footer-thumb-subtitle uppercase-text">{$postStore.imageSource} source · ativo</div>

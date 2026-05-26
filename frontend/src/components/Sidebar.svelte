@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
   import { LayoutDashboard, Sparkles, Settings, Search, Moon, Sun, Zap } from '@lucide/svelte';
+  import { API_URL } from '../lib/api';
 
   export let activePage: 'dashboard' | 'create' | 'settings' | 'automation' = 'dashboard';
   export let theme: 'dark' | 'light' = 'dark';
@@ -16,7 +17,7 @@
 
   async function checkLinkedInStatus() {
     try {
-      const res = await fetch('http://localhost:3000/api/auth/linkedin/status');
+      const res = await fetch(`${API_URL}/api/auth/linkedin/status`);
       if (res.ok) {
         const data = await res.json();
         isAuthenticated = data.authenticated;

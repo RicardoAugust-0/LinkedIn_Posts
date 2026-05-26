@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ThumbsUp, MessageSquare, Share2, Send, Globe, MoreHorizontal } from '@lucide/svelte';
+  import { API_URL } from '../lib/api';
   
   export let content: string = '';
   export let imageUrl: string | null = null;
@@ -62,7 +63,7 @@
   {#if imageUrl && imageSource !== 'none'}
     <div class="post-media">
       <img 
-        src={imageUrl.startsWith('/uploads') ? `http://localhost:3000${imageUrl}` : imageUrl} 
+        src={imageUrl.startsWith('/uploads') ? `${API_URL}${imageUrl}` : imageUrl} 
         alt={title || "Mídia do Post"} 
         class="media-image"
       />

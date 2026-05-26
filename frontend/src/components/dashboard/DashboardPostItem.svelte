@@ -3,6 +3,7 @@
   import { Clock, Sparkles, Send, Trash2 } from '@lucide/svelte';
   import StatusBadge from '../StatusBadge.svelte';
   import { createEventDispatcher } from 'svelte';
+  import { API_URL } from '../../lib/api';
   const dispatch = createEventDispatcher();
 
   export let post: any;
@@ -24,8 +25,8 @@
   <!-- Mini Thumbnail -->
   {#if post.image_url && post.image_source !== 'none'}
     <div class="post-card-thumbnail">
-      <img 
-        src={post.image_url.startsWith('/uploads') ? `http://localhost:3000${post.image_url}` : post.image_url} 
+       <img 
+        src={post.image_url.startsWith('/uploads') ? `${API_URL}${post.image_url}` : post.image_url} 
         alt={post.title} 
       />
     </div>

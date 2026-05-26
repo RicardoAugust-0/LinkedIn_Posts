@@ -4,6 +4,7 @@
   import { 
     CheckCircle2, AlertCircle
   } from '@lucide/svelte';
+  import { API_URL } from '../lib/api';
   import AutomationActiveBanner from '../components/automation/AutomationActiveBanner.svelte';
   import AutomationCampaignForm from '../components/automation/AutomationCampaignForm.svelte';
   import AutomationQueueTable from '../components/automation/AutomationQueueTable.svelte';
@@ -59,7 +60,7 @@
 
   async function loadSettings() {
     try {
-      const res = await fetch('http://localhost:3000/api/settings');
+      const res = await fetch(`${API_URL}/api/settings`);
       if (res.ok) {
         const settings = await res.json();
         campaignActive = settings.campaign_active;
@@ -76,7 +77,7 @@
 
   async function saveCampaignSettings() {
     try {
-      await fetch('http://localhost:3000/api/settings', {
+      await fetch(`${API_URL}/api/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -95,7 +96,7 @@
 
   async function fetchPosts() {
     try {
-      const res = await fetch('http://localhost:3000/api/posts?automated=true');
+      const res = await fetch(`${API_URL}/api/posts?automated=true`);
       if (res.ok) {
         const posts = await res.json();
         queue = posts.map((p: any) => ({
@@ -160,7 +161,7 @@
     generating = true;
     try {
       // 1. Chamar o backend para gerar os tópicos
-      const topicsRes = await fetch(`http://localhost:3000/api/generate/topics?seed=${encodeURIComponent(topicSeed)}`);
+      const topicsRes = await fetch(`${API_URL}/api/generate/topics?seed=${encodeURIComponent(topicSeed)}`);
       if (!topicsRes.ok) throw new Error("Falha ao sugerir tópicos de IA.");
       const topics = await topicsRes.json();
 
@@ -168,14 +169,14 @@
       const targetTopics = topics.slice(0, quantity);
 
       // Limpar posts antigos se for campanha nova
-      const clearRes = await fetch('http://localhost:3000/api/posts?automated=true', { method: 'DELETE' });
+      const clearRes = await fetch(`${API_URL}/api/posts?automated=true`, { method: 'DELETE' });
       if (!clearRes.ok) throw new Error("Falha ao reiniciar banco de dados.");
 
       // 2. Para cada tópico, gerar o texto do post
       let generatedCount = 0;
       for (const topic of targetTopics) {
         // Chamar o backend para gerar o texto do post
-        const textRes = await fetch('http://localhost:3000/api/generate/text', {
+        const textRes = await fetch(`${API_URL}/api/generate/text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -188,7 +189,7 @@
           const generatedData = await textRes.json();
           
           // Criar rascunho no banco com o texto gerado
-          const createRes = await fetch('http://localhost:3000/api/posts', {
+          const createRes = await fetch(`${API_URL}/api/posts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -238,7 +239,7 @@
     if (!confirm("Deseja realmente cancelar toda a esteira de publicações? Todos os posts serão excluídos.")) return;
     
     try {
-      const clearRes = await fetch('http://localhost:3000/api/posts?automated=true', { method: 'DELETE' });
+      const clearRes = await fetch(`${API_URL}/api/posts?automated=true`, { method: 'DELETE' });
       if (clearRes.ok) {
         queue = [];
         campaignActive = false;
@@ -269,7 +270,7 @@
     if (index === -1) return;
     
     try {
-      const generateRes = await fetch('http://localhost:3000/api/generate/text', {
+      const generateRes = await fetch(`${API_URL}/api/generate/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -281,7 +282,7 @@
       if (generateRes.ok) {
         const data = await generateRes.json();
         // Atualizar rascunho com o texto regenerado
-        await fetch(`http://localhost:3000/api/posts/${id}`, {
+        await fetch(`${API_URL}/api/posts/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -326,7 +327,7 @@
     if (!confirm("Excluir esta publicação da fila de automação?")) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/posts/${id}`, {
+      const res = await fetch(`${API_URL}/api/posts/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {

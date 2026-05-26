@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { Search, Calendar, Sparkles, X, CornerDownLeft } from '@lucide/svelte';
   import StatusBadge from './StatusBadge.svelte';
+  import { API_URL } from '../lib/api';
 
   export let show = false;
 
@@ -31,7 +32,7 @@
   async function loadPosts() {
     loading = true;
     try {
-      const res = await fetch('http://localhost:3000/api/posts');
+      const res = await fetch(`${API_URL}/api/posts`);
       if (res.ok) {
         posts = await res.json();
       }

@@ -1,6 +1,7 @@
 <!-- frontend/src/components/settings/SettingsHelp.svelte -->
 <script lang="ts">
   import { Info } from '@lucide/svelte';
+  import { API_URL } from '../../lib/api';
 </script>
 
 <!-- Help Documentation Card -->
@@ -13,7 +14,7 @@
   <ol class="help-steps-list">
     <li>Crie uma conta de desenvolvedor em <a href="https://developer.linkedin.com" target="_blank" rel="noopener noreferrer">LinkedIn Developer Portal</a>.</li>
     <li>Crie um novo aplicativo e solicite o produto de publicação <strong>Share on LinkedIn</strong> (escopo <code>w_member_social</code>).</li>
-    <li>Nas configurações do App do LinkedIn, registre o endereço callback autorizado: <code class="code-highlight">http://localhost:3000/api/auth/linkedin/callback</code>.</li>
+    <li>Nas configurações do App do LinkedIn, registre o endereço callback autorizado: <code class="code-highlight">{API_URL}/api/auth/linkedin/callback</code>.</li>
     <li>Insira o Client ID e Client Secret gerados no formulário acima, clique em Salvar e depois clique em "Conectar Conta" no primeiro painel.</li>
   </ol>
 </section>

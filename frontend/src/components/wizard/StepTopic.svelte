@@ -3,13 +3,14 @@
   import { Sparkles, Check, ArrowRight } from '@lucide/svelte';
   import { postStore } from '../../lib/stores/postStore';
   import { onMount } from 'svelte';
+  import { API_URL } from '../../lib/api';
 
   let loadingTopics = false;
 
   async function fetchSuggestedTopics() {
     loadingTopics = true;
     try {
-      const res = await fetch('http://localhost:3000/api/generate/topics');
+      const res = await fetch(`${API_URL}/api/generate/topics`);
       if (res.ok) {
         const topics = await res.json();
         postStore.setRecentTopics(topics);

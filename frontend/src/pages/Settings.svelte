@@ -4,6 +4,7 @@
   import { 
     Save, ExternalLink, AlertCircle, CheckCircle2, Check
   } from '@lucide/svelte';
+  import { API_URL } from '../lib/api';
   import SettingsLinkedInProfile from '../components/settings/SettingsLinkedInProfile.svelte';
   import SettingsAIKeys from '../components/settings/SettingsAIKeys.svelte';
   import SettingsLinkedInCredentials from '../components/settings/SettingsLinkedInCredentials.svelte';
@@ -51,7 +52,7 @@
     testingAll = true;
     testResults = null;
     try {
-      const res = await fetch('http://localhost:3000/api/settings/test-all', {
+      const res = await fetch(`${API_URL}/api/settings/test-all`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -115,7 +116,7 @@
 
   async function loadSettings() {
     try {
-      const res = await fetch('http://localhost:3000/api/settings');
+      const res = await fetch(`${API_URL}/api/settings`);
       if (res.ok) {
         const data = await res.json();
         geminiKey = data.gemini_key || '';
@@ -133,7 +134,7 @@
 
   async function checkAuthStatus() {
     try {
-      const res = await fetch('http://localhost:3000/api/auth/linkedin/status');
+      const res = await fetch(`${API_URL}/api/auth/linkedin/status`);
       if (res.ok) {
         const data = await res.json();
         isAuthenticated = data.authenticated;
@@ -149,7 +150,7 @@
     saving = true;
     showSaveSuccess = false;
     try {
-      const res = await fetch('http://localhost:3000/api/settings', {
+      const res = await fetch(`${API_URL}/api/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -174,7 +175,7 @@
   }
 
   function startLinkedInAuth() {
-    window.location.href = 'http://localhost:3000/api/auth/linkedin';
+    window.location.href = `${API_URL}/api/auth/linkedin`;
   }
 
   async function disconnectLinkedIn() {
@@ -182,7 +183,7 @@
     
     disconnecting = true;
     try {
-      const res = await fetch('http://localhost:3000/api/auth/linkedin/disconnect', {
+      const res = await fetch(`${API_URL}/api/auth/linkedin/disconnect`, {
         method: 'POST'
       });
       if (res.ok) {
@@ -222,7 +223,7 @@
 
     clearingDb = true;
     try {
-      const res = await fetch('http://localhost:3000/api/posts', {
+      const res = await fetch(`${API_URL}/api/posts`, {
         method: 'DELETE'
       });
 

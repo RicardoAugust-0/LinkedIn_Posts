@@ -1,5 +1,6 @@
 // frontend/src/lib/stores/postStore.ts
 import { writable } from 'svelte/store';
+import { API_URL } from '../api';
 
 export interface PostState {
   step: number;
@@ -126,7 +127,7 @@ function createPostStore() {
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/generate/text', {
+        const res = await fetch(`${API_URL}/api/generate/text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -171,7 +172,7 @@ function createPostStore() {
       }
 
       try {
-        const res = await fetch(`http://localhost:3000/api/search/images?query=${encodeURIComponent(currentQuery)}`);
+        const res = await fetch(`${API_URL}/api/search/images?query=${encodeURIComponent(currentQuery)}`);
         if (res.ok) {
           const images = await res.json();
           update(s => ({ ...s, googleImages: images, imageSource: 'google' }));
@@ -202,7 +203,7 @@ function createPostStore() {
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/generate/image', {
+        const res = await fetch(`${API_URL}/api/generate/image`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: currentPrompt })
@@ -260,7 +261,7 @@ function createPostStore() {
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/posts', {
+        const res = await fetch(`${API_URL}/api/posts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -279,7 +280,7 @@ function createPostStore() {
           const savedPost = await res.json();
           
           if (publishImmediately) {
-            const pubRes = await fetch(`http://localhost:3000/api/posts/${savedPost.id}/publish`, {
+            const pubRes = await fetch(`${API_URL}/api/posts/${savedPost.id}/publish`, {
               method: 'POST'
             });
             const pubData = await pubRes.json();

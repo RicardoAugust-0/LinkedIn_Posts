@@ -4,6 +4,7 @@
   import { 
     Clock, Sparkles, CheckCircle2, AlertCircle
   } from '@lucide/svelte';
+  import { API_URL } from '../lib/api';
   import DashboardStats from '../components/dashboard/DashboardStats.svelte';
   import DashboardToolbar from '../components/dashboard/DashboardToolbar.svelte';
   import DashboardPostItem from '../components/dashboard/DashboardPostItem.svelte';
@@ -69,7 +70,7 @@
 
   async function loadDashboardStats() {
     try {
-      const res = await fetch('http://localhost:3000/api/posts/stats');
+      const res = await fetch(`${API_URL}/api/posts/stats`);
       if (res.ok) {
         stats = await res.json();
       }
@@ -80,7 +81,7 @@
 
   async function loadPosts() {
     try {
-      const res = await fetch('http://localhost:3000/api/posts');
+      const res = await fetch(`${API_URL}/api/posts`);
       if (res.ok) {
         posts = await res.json();
         // Manter o post selecionado atualizado após recarregar
@@ -99,7 +100,7 @@
     if (!confirm("Deseja realmente excluir esta publicação do banco de dados local?")) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/posts/${id}`, {
+      const res = await fetch(`${API_URL}/api/posts/${id}`, {
         method: 'DELETE'
       });
 
@@ -121,7 +122,7 @@
     publishingId = id;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/posts/${id}/publish`, {
+      const res = await fetch(`${API_URL}/api/posts/${id}/publish`, {
         method: 'POST'
       });
 
