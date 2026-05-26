@@ -1,0 +1,209 @@
+/* ============================================================================
+   LINKEDMAKER — Studio Design System
+   Colors + Typography Tokens
+
+   Pulled directly from frontend/src/app.css of the LinkedIn AI Post Automator
+   ("Studio Redesign"). Defaults to dark theme; light theme overrides via
+   :root.theme-light.
+   ============================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  /* ---------- Type families ---------- */
+  --font-main: 'Geist', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-serif-display: 'Geist', serif; /* Not used today; placeholder if a serif voice is added */
+
+  /* ---------- Semantic type scale ----------
+     Map your h1/h2/h3/p to these and the system stays consistent. */
+  --type-h1-size: 1.875rem;   /* 30px */
+  --type-h1-weight: 600;
+  --type-h1-tracking: -0.03em;
+  --type-h1-leading: 1.15;
+
+  --type-h2-size: 1.06rem;    /* ~17px */
+  --type-h2-weight: 600;
+  --type-h2-tracking: -0.01em;
+
+  --type-h3-size: 0.95rem;    /* ~15px */
+  --type-h3-weight: 600;
+
+  --type-body-size: 0.84375rem;   /* 13.5px — the workhorse */
+  --type-body-leading: 1.55;
+
+  --type-label-size: 0.8125rem;   /* 13px */
+  --type-label-weight: 500;
+
+  --type-eyebrow-size: 0.71875rem; /* 11.5px — mono, uppercase, 0.06–0.12em tracking */
+  --type-eyebrow-tracking: 0.12em;
+
+  --type-hint-size: 0.71875rem;   /* 11.5px */
+  --type-stat-size: 2.25rem;      /* 36px stat values */
+  --type-mono-meta-size: 0.6875rem; /* 11px mono metadata */
+
+  /* ---------- Dark theme (default) ---------- */
+  --bg-app: #0a0a0b;          /* deepest app background */
+  --bg-inset: #070708;        /* recessed surface — feeds, preview wells */
+  --surface: #111114;         /* primary card */
+  --surface-alt: #15151a;     /* nested card / toolbar */
+  --surface-hover: #1a1a20;   /* hover lift */
+
+  --border: #1f1f23;          /* default rule */
+  --border-strong: #2a2a31;   /* focus / selected */
+
+  --text: #ededed;            /* primary copy */
+  --text-muted: #9c9ca6;      /* secondary copy, labels */
+  --text-dim: #6a6a73;        /* metadata, placeholders */
+
+  /* Accents */
+  --accent: #a3e635;          /* lime — primary AI action */
+  --accent-ink: #0a0a0b;
+  --accent-muted: rgba(163, 230, 53, 0.10);
+
+  --cyan: #67e8f9;            /* secondary — schedule / links / hashtags */
+  --cyan-ink: #0a0a0b;
+  --cyan-muted: rgba(103, 232, 249, 0.10);
+
+  --rose: #fb7185;            /* danger / failed */
+  --rose-muted: rgba(251, 113, 133, 0.10);
+
+  --amber: #fbbf24;           /* warning / simulation mode */
+
+  --avatar-a: #2b2b34;
+  --avatar-b: #4a4a55;
+
+  /* ---------- Motion ---------- */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---------- Layout primitives ---------- */
+  --sidebar-width: 236px;
+
+  --radius-xs: 4px;     /* mono badges */
+  --radius-sm: 6px;     /* icon buttons, segments */
+  --radius-md: 8px;     /* nav items, search bar */
+  --radius-lg: 9px;     /* inputs, buttons */
+  --radius-xl: 12px;    /* stat cards, list rows */
+  --radius-2xl: 14px;   /* main cards / panels */
+  --radius-pill: 999px; /* status badges, chips */
+
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 14px;
+  --space-7: 16px;
+  --space-8: 18px;
+  --space-9: 20px;
+  --space-10: 22px;
+  --space-12: 24px;
+  --space-14: 28px;
+  --space-16: 32px;
+
+  /* ---------- Elevation ----------
+     LinkedMaker is mostly flat; lift comes from value contrast, not heavy shadow. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.10);
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-popover: 0 10px 25px rgba(0, 0, 0, 0.25);
+  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  --ring-selected: 0 0 0 3px rgba(163, 230, 53, 0.06);
+  --ring-focus: 0 0 0 1px var(--border-strong);
+}
+
+/* ---------- Light theme ---------- */
+:root.theme-light {
+  --bg-app: #fafaf7;
+  --bg-inset: #f3f2ec;
+  --surface: #ffffff;
+  --surface-alt: #f5f4ef;
+  --surface-hover: #efeee8;
+  --border: #e6e4dc;
+  --border-strong: #d4d2c8;
+  --text: #16161a;
+  --text-muted: #56565e;
+  --text-dim: #8a8a92;
+
+  --accent: #3f6212;             /* deep olive — same hue family, ink-on-paper */
+  --accent-ink: #ffffff;
+  --accent-muted: rgba(63, 98, 18, 0.08);
+
+  --cyan: #0e7490;
+  --cyan-ink: #ffffff;
+  --cyan-muted: rgba(14, 116, 144, 0.08);
+
+  --rose: #be123c;
+  --rose-muted: rgba(190, 18, 60, 0.07);
+
+  --amber: #b45309;
+
+  --avatar-a: #1a1a1a;
+  --avatar-b: #3a3a3a;
+
+  --ring-selected: 0 0 0 3px rgba(26, 26, 26, 0.04);
+}
+
+/* ============================================================================
+   Semantic element styles — apply tokens directly to h1, h2, p, etc.
+   Drop this stylesheet on any HTML page and headings render correctly.
+   ============================================================================ */
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-app);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1 {
+  font-size: var(--type-h1-size);
+  font-weight: var(--type-h1-weight);
+  letter-spacing: var(--type-h1-tracking);
+  line-height: var(--type-h1-leading);
+  color: var(--text);
+}
+
+h2 {
+  font-size: var(--type-h2-size);
+  font-weight: var(--type-h2-weight);
+  letter-spacing: var(--type-h2-tracking);
+  color: var(--text);
+}
+
+h3 {
+  font-size: var(--type-h3-size);
+  font-weight: var(--type-h3-weight);
+  color: var(--text);
+}
+
+p {
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-leading);
+  color: var(--text-muted);
+}
+
+code, kbd, .mono {
+  font-family: var(--font-mono);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--type-eyebrow-size);
+  letter-spacing: var(--type-eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.label {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  color: var(--text);
+}
+
+.hint {
+  font-size: var(--type-hint-size);
+  color: var(--text-dim);
+  line-height: 1.4;
+}

@@ -13,21 +13,20 @@ pub struct ImageSearchResult {
 }
 
 #[derive(Debug, Deserialize)]
-struct GoogleSearchResponse {
-    items: Option<Vec<GoogleSearchItem>>,
+struct PexelsResponse {
+    photos: Option<Vec<PexelsPhoto>>,
 }
 
 #[derive(Debug, Deserialize)]
-struct GoogleSearchItem {
-    title: Option<String>,
-    link: Option<String>,
-    image: Option<GoogleImageDetail>,
+struct PexelsPhoto {
+    alt: Option<String>,
+    src: Option<PexelsPhotoSrc>,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(non_snake_case)]
-struct GoogleImageDetail {
-    thumbnailLink: Option<String>,
+struct PexelsPhotoSrc {
+    large: Option<String>,
+    medium: Option<String>,
 }
 
 pub async fn search_images(
@@ -36,81 +35,97 @@ pub async fn search_images(
 ) -> Result<Vec<ImageSearchResult>, AppError> {
     // Buscar chaves
     let settings = sqlx::query_as::<_, Settings>(
-        "SELECT id, gemini_key, google_search_key, google_search_cx, linkedin_client_id, linkedin_client_secret, linkedin_access_token, linkedin_access_token_expires FROM settings WHERE id = 1"
+        "SELECT id, gemini_key, google_search_key, google_search_cx, linkedin_client_id, linkedin_client_secret, linkedin_access_token, linkedin_access_token_expires, pexels_key, user_context FROM settings WHERE id = 1"
     )
     .fetch_one(pool)
     .await?;
 
-    let has_keys = settings.google_search_key.is_some() && settings.google_search_cx.is_some();
+    let has_key = settings.pexels_key.as_ref().map(|k| !k.trim().is_empty()).unwrap_or(false);
 
-    if !has_keys || query.to_lowercase().contains("mock") {
+    if !has_key || query.to_lowercase().contains("mock") {
         info!("Rodando busca de imagens no modo Simulação (Mock).");
-        // Gerar 6 imagens mockadas baseado no termo de busca para parecer realista
-        let clean_query = query.replace(' ', "+");
-        let mock_results = vec![
-            ImageSearchResult {
-                title: format!("Referência visual para: {}", query),
-                link: format!("https://picsum.photos/seed/{}/800/600", format!("{}1", clean_query)),
-                thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}1", clean_query)),
-            },
-            ImageSearchResult {
-                title: format!("Inspiração de tecnologia: {}", query),
-                link: format!("https://picsum.photos/seed/{}/800/600", format!("{}2", clean_query)),
-                thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}2", clean_query)),
-            },
-            ImageSearchResult {
-                title: format!("Diagrama corporativo - {}", query),
-                link: format!("https://picsum.photos/seed/{}/800/600", format!("{}3", clean_query)),
-                thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}3", clean_query)),
-            },
-            ImageSearchResult {
-                title: format!("Design conceitual de {}", query),
-                link: format!("https://picsum.photos/seed/{}/800/600", format!("{}4", clean_query)),
-                thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}4", clean_query)),
-            },
-            ImageSearchResult {
-                title: format!("Espaço de trabalho de desenvolvimento ({})", query),
-                link: format!("https://picsum.photos/seed/{}/800/600", format!("{}5", clean_query)),
-                thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}5", clean_query)),
-            },
-            ImageSearchResult {
-                title: format!("Ilustração de IA sobre {}", query),
-                link: format!("https://picsum.photos/seed/{}/800/600", format!("{}6", clean_query)),
-                thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}6", clean_query)),
-            },
-        ];
-        return Ok(mock_results);
+        return Ok(get_mock_results(query));
     }
 
-    // Modo real: chamando a API do Google Custom Search
-    let key = settings.google_search_key.ok_or_else(|| AppError::BadRequest("Chave Google Search API ausente".to_string()))?;
-    let cx = settings.google_search_cx.ok_or_else(|| AppError::BadRequest("ID do mecanismo de busca Google CX ausente".to_string()))?;
+    // Modo real: chamando a API do Pexels
+    let key = settings.pexels_key.ok_or_else(|| AppError::BadRequest("Chave Pexels API ausente".to_string()))?;
     
-    let url = format!(
-        "https://www.googleapis.com/customsearch/v1?key={}&cx={}&q={}&searchType=image&num=6",
-        key, cx, query
-    );
+    let url = "https://api.pexels.com/v1/search";
 
-    info!("Buscando imagens na API do Google para a query: {}", query);
+    info!("Buscando imagens na API do Pexels para a query: {}", query);
 
     let client = reqwest::Client::new();
-    let resp = client.get(&url).send().await?;
+    let resp = match client.get(url)
+        .header("Authorization", &key)
+        .query(&[("query", query), ("per_page", "6")])
+        .send()
+        .await 
+    {
+        Ok(r) => r,
+        Err(e) => {
+            warn!("Erro ao enviar requisição para Pexels API: {}. Usando fallback mock.", e);
+            return Ok(get_mock_results(query));
+        }
+    };
 
     if !resp.status().is_success() {
         let status = resp.status();
         let err_text = resp.text().await.unwrap_or_default();
-        warn!("Google API Error: {}", err_text);
-        return Err(AppError::Internal(format!("Google API returned status {}: {}", status, err_text)));
+        warn!("Pexels API Error (Status {}): {}. Usando fallback mock.", status, err_text);
+        return Ok(get_mock_results(query));
     }
 
-    let search_res: GoogleSearchResponse = resp.json().await?;
+    let search_res: PexelsResponse = match resp.json().await {
+        Ok(res) => res,
+        Err(e) => {
+            warn!("Erro ao ler JSON da API Pexels: {}. Usando fallback mock.", e);
+            return Ok(get_mock_results(query));
+        }
+    };
 
-    let results = search_res.items.unwrap_or_default().into_iter().filter_map(|item| {
-        let title = item.title.unwrap_or_else(|| "Google Image".to_string());
-        let link = item.link?;
-        let thumbnail = item.image.and_then(|img| img.thumbnailLink).unwrap_or_else(|| link.clone());
+    let results = search_res.photos.unwrap_or_default().into_iter().filter_map(|photo| {
+        let title = photo.alt.filter(|t| !t.trim().is_empty()).unwrap_or_else(|| format!("Imagem Pexels: {}", query));
+        let src = photo.src?;
+        let link = src.large?;
+        let thumbnail = src.medium.unwrap_or(link.clone());
         Some(ImageSearchResult { title, link, thumbnail })
     }).collect::<Vec<_>>();
 
     Ok(results)
+}
+
+fn get_mock_results(query: &str) -> Vec<ImageSearchResult> {
+    let clean_query = query.replace(' ', "+");
+    vec![
+        ImageSearchResult {
+            title: format!("Referência visual para: {}", query),
+            link: format!("https://picsum.photos/seed/{}/800/600", format!("{}1", clean_query)),
+            thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}1", clean_query)),
+        },
+        ImageSearchResult {
+            title: format!("Inspiração de tecnologia: {}", query),
+            link: format!("https://picsum.photos/seed/{}/800/600", format!("{}2", clean_query)),
+            thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}2", clean_query)),
+        },
+        ImageSearchResult {
+            title: format!("Diagrama corporativo - {}", query),
+            link: format!("https://picsum.photos/seed/{}/800/600", format!("{}3", clean_query)),
+            thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}3", clean_query)),
+        },
+        ImageSearchResult {
+            title: format!("Design conceitual de {}", query),
+            link: format!("https://picsum.photos/seed/{}/800/600", format!("{}4", clean_query)),
+            thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}4", clean_query)),
+        },
+        ImageSearchResult {
+            title: format!("Espaço de trabalho de desenvolvimento ({})", query),
+            link: format!("https://picsum.photos/seed/{}/800/600", format!("{}5", clean_query)),
+            thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}5", clean_query)),
+        },
+        ImageSearchResult {
+            title: format!("Ilustração de IA sobre {}", query),
+            link: format!("https://picsum.photos/seed/{}/800/600", format!("{}6", clean_query)),
+            thumbnail: format!("https://picsum.photos/seed/{}/300/200", format!("{}6", clean_query)),
+        },
+    ]
 }

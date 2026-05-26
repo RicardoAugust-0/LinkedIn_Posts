@@ -50,23 +50,25 @@ pub async fn linkedin_callback(
     State(config): State<AppConfig>,
     Query(params): Query<AuthCallbackParams>,
 ) -> Result<Redirect, AppError> {
+    let frontend_url = &config.frontend_url;
+
     if let Some(err) = params.error {
         tracing::error!("Erro de autenticação no LinkedIn: {}", err);
-        return Ok(Redirect::to("/settings?auth=error"));
+        return Ok(Redirect::to(&format!("{}/settings?auth=error", frontend_url)));
     }
 
     let code = params.code.ok_or_else(|| {
         AppError::BadRequest("Código de autorização ausente".to_string())
     })?;
 
-    let frontend_redirect_url = "/settings?auth=success";
+    let frontend_redirect_url = format!("{}/settings?auth=success", frontend_url);
 
     if let Err(e) = handle_callback(&pool, &code, &config.public_url).await {
         tracing::error!("Erro ao processar callback do LinkedIn: {}", e);
-        return Ok(Redirect::to("/settings?auth=error"));
+        return Ok(Redirect::to(&format!("{}/settings?auth=error", frontend_url)));
     }
 
-    Ok(Redirect::to(frontend_redirect_url))
+    Ok(Redirect::to(&frontend_redirect_url))
 }
 
 pub async fn publish_post_now(

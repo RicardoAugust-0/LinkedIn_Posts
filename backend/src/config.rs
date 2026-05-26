@@ -6,6 +6,7 @@ pub struct AppConfig {
     pub port: u16,
     pub host: String,
     pub public_url: String,
+    pub frontend_url: String,
 }
 
 impl AppConfig {
@@ -24,11 +25,14 @@ impl AppConfig {
         
         let public_url = env::var("PUBLIC_URL").unwrap_or_else(|_| format!("http://localhost:{}", port));
 
+        let frontend_url = env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+
         Self {
             database_url,
             port,
             host,
             public_url,
+            frontend_url,
         }
     }
 }

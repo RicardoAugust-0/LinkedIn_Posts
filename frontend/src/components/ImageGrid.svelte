@@ -66,17 +66,12 @@
   }
 
   .image-card.selected {
-    border: 2px solid var(--text);
+    border: 2px solid var(--accent);
+    box-shadow: var(--ring-selected);
   }
   
   :global(.theme-light) .image-card.selected {
-    border-color: #1a1a1a;
-    box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.08);
-  }
-  
-  :global(.theme-dark) .image-card.selected {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.12);
+    border-color: var(--text);
   }
 
   .img-container {
@@ -99,14 +94,10 @@
   .selected-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(26, 26, 26, 0.05);
+    background: var(--accent-muted);
     display: flex;
     align-items: center;
     justify-content: center;
-  }
-
-  :global(.theme-dark) .selected-overlay {
-    background: rgba(163, 230, 53, 0.05);
   }
 
   .check-badge {
@@ -120,15 +111,12 @@
     align-items: center;
     justify-content: center;
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-  }
-
-  :global(.theme-dark) .check-badge {
     background: var(--accent);
     color: var(--accent-ink);
   }
   
   :global(.theme-light) .check-badge {
-    background: #1a1a1a;
-    color: #ffffff;
+    background: var(--text);
+    color: var(--bg-app);
   }
 </style>

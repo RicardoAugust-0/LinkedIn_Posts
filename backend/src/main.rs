@@ -98,11 +98,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         // API AI e Search
         .route("/api/generate/text", post(handlers::ai::generate_text))
+        .route("/api/generate/improve", post(handlers::ai::improve_post))
         .route("/api/generate/image", post(handlers::ai::generate_image))
+        .route("/api/generate/topics", get(handlers::ai::suggest_topics))
         .route("/api/search/images", get(handlers::search::search_images))
         
         // API Configurações e LinkedIn Auth
         .route("/api/settings", get(handlers::settings::get_settings).put(handlers::settings::save_settings))
+        .route("/api/settings/test-all", post(handlers::settings::test_all_credentials))
         .route("/api/auth/linkedin", get(handlers::auth::linkedin_login))
         .route("/api/auth/linkedin/callback", get(handlers::auth::linkedin_callback))
         .route("/api/auth/linkedin/status", get(handlers::auth::get_auth_status))

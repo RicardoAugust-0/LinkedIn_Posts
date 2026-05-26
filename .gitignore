@@ -36,3 +36,5 @@ target/
 
 # Project specific uploads/data
 backend/uploads/
+*.db
+backend/*.db

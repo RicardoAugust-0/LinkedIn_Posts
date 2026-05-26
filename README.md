@@ -22,7 +22,7 @@ Uma plataforma full-stack moderna projetada para portfólio, criada com um robus
 ### I.A. & Busca
 - **Gemini API (Google AI Studio)**:
   - **Geração de Texto**: Gemini 1.5 Flash (redação persuasiva do post do LinkedIn).
-  - **Geração de Imagens**: Google Imagen 3 (criação de imagens exclusivas direto do prompt da I.A.).
+  - **Geração de Imagens**: Google Imagen 4 (criação de imagens exclusivas direto do prompt da I.A.).
 - **Google Custom Search API**: Busca de imagens de referência e inspiração.
 
 ---
@@ -32,7 +32,7 @@ Uma plataforma full-stack moderna projetada para portfólio, criada com um robus
 1. **Dashboard & Métricas**: Acompanhamento de posts totais, rascunhos, agendados e publicados com gráficos e badges informativas.
 2. **Assistente de Post (Wizard em 3 Etapas)**:
    - **Etapa 1**: Definição do tema e geração automática de texto com o Gemini.
-   - **Etapa 2**: Edição do post em tempo real e adição de mídia (busca no Google ou geração com Imagen 3).
+   - **Etapa 2**: Edição do post em tempo real e adição de mídia (busca no Google ou geração com Imagen 4).
    - **Etapa 3**: Escolha de postagem imediata ou agendamento de data/hora.
 3. **LinkedIn Live Preview**: Prévia do post idêntica ao feed real do LinkedIn (com hashtags azuis, layout do autor, imagem e botões de reação).
 4. **Modo de Simulação (Mock Mode)**: Funciona perfeitamente de forma simulada se o usuário não inserir chaves de API. Ideal para demonstrações públicas em portfólios, permitindo testar toda a jornada sem vazar segredos ou quebrar integrações.

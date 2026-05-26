@@ -15,9 +15,13 @@ pub async fn init_db(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
 
     info!("Conectando ao banco de dados SQLite: {}", database_url);
     
+    use std::str::FromStr;
+    let connection_options = sqlx::sqlite::SqliteConnectOptions::from_str(database_url)?
+        .create_if_missing(true);
+
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(database_url)
+        .connect_with(connection_options)
         .await?;
 
     // Criar as tabelas se não existirem
@@ -30,11 +34,57 @@ pub async fn init_db(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
             linkedin_client_id TEXT,
             linkedin_client_secret TEXT,
             linkedin_access_token TEXT,
-            linkedin_access_token_expires TEXT
+            linkedin_access_token_expires TEXT,
+            pexels_key TEXT,
+            user_context TEXT,
+            campaign_active BOOLEAN NOT NULL DEFAULT 0,
+            campaign_topic TEXT,
+            campaign_quantity INTEGER DEFAULT 10,
+            campaign_cadence TEXT,
+            campaign_windows TEXT,
+            campaign_tone TEXT
         );"
     )
     .execute(&pool)
     .await?;
+
+    // Adicionar a coluna pexels_key se ela não existir em bancos existentes
+    sqlx::query("ALTER TABLE settings ADD COLUMN pexels_key TEXT;")
+        .execute(&pool)
+        .await
+        .ok();
+
+    // Adicionar a coluna user_context se ela não existir em bancos existentes
+    sqlx::query("ALTER TABLE settings ADD COLUMN user_context TEXT;")
+        .execute(&pool)
+        .await
+        .ok();
+
+    // Adicionar colunas da campanha em settings se não existirem
+    sqlx::query("ALTER TABLE settings ADD COLUMN campaign_active BOOLEAN NOT NULL DEFAULT 0;")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE settings ADD COLUMN campaign_topic TEXT;")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE settings ADD COLUMN campaign_quantity INTEGER DEFAULT 10;")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE settings ADD COLUMN campaign_cadence TEXT;")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE settings ADD COLUMN campaign_windows TEXT;")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE settings ADD COLUMN campaign_tone TEXT;")
+        .execute(&pool)
+        .await
+        .ok();
 
     // Inserir registro inicial de settings se não existir
     sqlx::query(
@@ -55,11 +105,18 @@ pub async fn init_db(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
             scheduled_at TEXT,
             published_at TEXT,
             created_at TEXT NOT NULL,
-            linkedin_post_id TEXT
+            linkedin_post_id TEXT,
+            is_automated BOOLEAN NOT NULL DEFAULT 0
         );"
     )
     .execute(&pool)
     .await?;
+
+    // Adicionar a coluna is_automated em posts se não existir em bancos existentes
+    sqlx::query("ALTER TABLE posts ADD COLUMN is_automated BOOLEAN NOT NULL DEFAULT 0;")
+        .execute(&pool)
+        .await
+        .ok();
 
     info!("Banco de dados SQLite inicializado com sucesso.");
     Ok(pool)

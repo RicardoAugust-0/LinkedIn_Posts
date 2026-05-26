@@ -22,6 +22,7 @@ export interface PostState {
   savingPost: boolean;
   errorMsg: string | null;
   successMsg: string | null;
+  recentTopics: string[];
 }
 
 const initialState: PostState = {
@@ -45,14 +46,54 @@ const initialState: PostState = {
   savingPost: false,
   errorMsg: null,
   successMsg: null,
+  recentTopics: [],
 };
 
 function createPostStore() {
-  const { subscribe, set, update } = writable<PostState>({ ...initialState });
+  const LOCAL_STORAGE_KEY = 'quill-post-wizard-state';
+  
+  let persisted = { ...initialState };
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (saved) {
+        persisted = {
+          ...initialState,
+          ...JSON.parse(saved),
+          generatingText: false,
+          searchingImages: false,
+          generatingImage: false,
+          savingPost: false,
+          errorMsg: null,
+          successMsg: null
+        };
+      }
+    } catch (e) {
+      console.error(persisted);
+    }
+  }
+
+  const { subscribe, set, update } = writable<PostState>(persisted);
+
+  // Subscribe to changes and persist
+  if (typeof window !== 'undefined') {
+    subscribe(state => {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  }
 
   return {
     subscribe,
-    reset: () => set({ ...initialState }),
+    reset: () => {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+      }
+      set({ ...initialState });
+    },
     setStep: (step: number) => update(s => ({ ...s, step })),
     setTopic: (topic: string) => update(s => ({ ...s, topic })),
     setPromptOverride: (promptOverride: string) => update(s => ({ ...s, promptOverride })),
@@ -67,6 +108,7 @@ function createPostStore() {
     setScheduleTime: (time: string) => update(s => ({ ...s, scheduleTime: time })),
     setError: (msg: string | null) => update(s => ({ ...s, errorMsg: msg })),
     setSuccess: (msg: string | null) => update(s => ({ ...s, successMsg: msg })),
+    setRecentTopics: (topics: string[]) => update(s => ({ ...s, recentTopics: topics })),
 
     generateText: async () => {
       let currentTopic = '';
@@ -228,7 +270,8 @@ function createPostStore() {
             image_url: selectedImageUrl,
             image_source: imageSource === 'upload' ? 'google' : imageSource,
             status,
-            scheduled_at: scheduledAt
+            scheduled_at: scheduledAt,
+            is_automated: false
           })
         });
 

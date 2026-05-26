@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { LayoutDashboard, Sparkles, Settings, Search, Moon, Sun } from '@lucide/svelte';
+  import { LayoutDashboard, Sparkles, Settings, Search, Moon, Sun, Zap } from '@lucide/svelte';
 
-  export let activePage: 'dashboard' | 'create' | 'settings' = 'dashboard';
+  export let activePage: 'dashboard' | 'create' | 'settings' | 'automation' = 'dashboard';
   export let theme: 'dark' | 'light' = 'dark';
 
   const dispatch = createEventDispatcher();
@@ -31,7 +31,7 @@
     }
   }
 
-  function navigate(page: 'dashboard' | 'create' | 'settings') {
+  function navigate(page: 'dashboard' | 'create' | 'settings' | 'automation') {
     dispatch('navigate', page);
   }
 
@@ -47,7 +47,7 @@
       <Sparkles size={14} />
     </div>
     <div class="brand-text">
-      <div class="brand-name">Quill</div>
+      <div class="brand-name">LinkedMaker</div>
       <div class="brand-version">posts · v2</div>
     </div>
   </div>
@@ -80,6 +80,14 @@
     </button>
 
     <button 
+      class="nav-link {activePage === 'automation' ? 'active' : ''}" 
+      on:click={() => navigate('automation')}
+    >
+      <Zap size={15} class="automation-icon" />
+      <span class="nav-label">Automação</span>
+    </button>
+
+    <button 
       class="nav-link {activePage === 'settings' ? 'active' : ''}" 
       on:click={() => navigate('settings')}
     >
@@ -104,7 +112,7 @@
       {/if}
     </div>
     <div class="progress-bar-container">
-      <div class="progress-bar-fill" style="width: {isAuthenticated ? Math.min(100, (daysRemaining / 60) * 100) : 100}%"></div>
+      <div class="progress-bar-fill {isAuthenticated ? 'connected' : 'simulated'}" style="width: {isAuthenticated ? Math.min(100, (daysRemaining / 60) * 100) : 100}%"></div>
     </div>
   </div>
 
@@ -113,7 +121,7 @@
     <div class="user-avatar">RA</div>
     <div class="user-info">
       <div class="user-name">Ricardo Augusto</div>
-      <div class="user-email">ricardo@quill.dev</div>
+      <div class="user-email">ricardo@linkedmaker.dev</div>
     </div>
     <button class="theme-toggle-btn" on:click={toggleTheme} title="Alternar tema">
       {#if theme === 'dark'}
@@ -162,7 +170,7 @@
   }
 
   :global(.theme-light) .brand-icon {
-    background: #1a1a1a;
+    background: var(--text);
     border: none;
     box-shadow: 0 1px 2px rgba(0,0,0,0.08);
   }
@@ -201,7 +209,7 @@
     font-size: 12.5px;
   }
 
-  .search-icon {
+  :global(.search-icon) {
     color: var(--text-dim);
   }
 
@@ -269,6 +277,14 @@
     color: var(--accent);
   }
 
+  .nav-link.active :global(svg.automation-icon) {
+    color: var(--accent);
+  }
+
+  .nav-link:hover :global(svg.automation-icon) {
+    color: var(--accent);
+  }
+
   .sidebar-spacer {
     flex: 1;
   }
@@ -332,13 +348,11 @@
     transition: width var(--transition-normal);
   }
 
-  .status-indicator-dot.connected ~ .progress-bar-container .progress-bar-fill,
-  .connection-card:has(.status-indicator-dot.connected) .progress-bar-fill {
+  .progress-bar-fill.connected {
     background-color: var(--accent);
   }
 
-  .status-indicator-dot.simulated ~ .progress-bar-container .progress-bar-fill,
-  .connection-card:has(.status-indicator-dot.simulated) .progress-bar-fill {
+  .progress-bar-fill.simulated {
     background-color: var(--amber);
   }
 

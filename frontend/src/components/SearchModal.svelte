@@ -4,8 +4,7 @@
   import StatusBadge from './StatusBadge.svelte';
 
   export let show = false;
-  export let theme: 'dark' | 'light' = 'dark';
-  
+
   import { createEventDispatcher } from 'svelte';
   const dispatch = createEventDispatcher();
 
@@ -208,7 +207,7 @@
     background: var(--surface);
     border: 1px solid var(--border-strong);
     border-radius: 12px;
-    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.35);
+    box-shadow: var(--shadow-popover);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -234,7 +233,7 @@
     gap: 12px;
   }
 
-  .search-input-icon {
+  :global(.search-input-icon) {
     color: var(--text-muted);
   }
 
@@ -323,7 +322,7 @@
     height: 180px;
   }
 
-  .empty-icon {
+  :global(.empty-icon) {
     color: var(--text-dim);
     margin-bottom: 12px;
   }

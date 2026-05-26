@@ -15,7 +15,7 @@
 
 <span class="status-badge {status} {mono ? 'mono' : ''}">
   <span class="status-dot"></span>
-  <span class="status-label">{translatedStatus}</span>
+  <span class="status-label">{mono ? status : translatedStatus}</span>
 </span>
 
 <style>

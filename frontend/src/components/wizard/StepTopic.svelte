@@ -2,16 +2,62 @@
 <script lang="ts">
   import { Sparkles, Check, ArrowRight } from '@lucide/svelte';
   import { postStore } from '../../lib/stores/postStore';
+  import { onMount } from 'svelte';
 
-  const recentTopics = [
-    'Rust 1.95 e const generics', 
-    'Edge runtime migrations', 
-    'Liderança técnica pragmática', 
-    'Burnout em times de produto'
-  ];
+  let loadingTopics = false;
+
+  async function fetchSuggestedTopics() {
+    loadingTopics = true;
+    try {
+      const res = await fetch('http://localhost:3000/api/generate/topics');
+      if (res.ok) {
+        const topics = await res.json();
+        postStore.setRecentTopics(topics);
+      } else {
+        postStore.setRecentTopics([
+          'Rust 1.95 e const generics', 
+          'Edge runtime migrations', 
+          'Liderança técnica pragmática', 
+          'Burnout em times de produto'
+        ]);
+      }
+    } catch (e) {
+      console.error("Erro ao buscar tópicos sugeridos pela IA:", e);
+      postStore.setRecentTopics([
+        'Rust 1.95 e const generics', 
+        'Edge runtime migrations', 
+        'Liderança técnica pragmática', 
+        'Burnout em times de produto'
+      ]);
+    } finally {
+      loadingTopics = false;
+    }
+  }
+
+  onMount(() => {
+    if ($postStore.recentTopics.length === 0) {
+      fetchSuggestedTopics();
+    }
+  });
 
   function selectRecentTopic(t: string) {
     postStore.setTopic(t);
+  }
+
+  const tonePresets = [
+    { id: 'casual',    label: 'Casual técnico',         value: 'Casual, conversa de engenheiro. Linguagem direta, exemplos práticos, sem jargão de marketing.' },
+    { id: 'checklist', label: 'Pragmático com checklist', value: 'Tom pragmático. Sempre incluir checklist no final. Foco no que funciona em produção.' },
+    { id: 'story',     label: 'Storytelling de bastidores', value: 'Storytelling de bastidores. Começar com um problema real, mostrar a investigação, fechar com o aprendizado.' },
+    { id: 'opinion',   label: 'Opinião forte e direta', value: 'Opinião forte e direta. Tomar lado. Defender a posição com 2 a 3 argumentos concretos.' },
+    { id: 'tutorial',  label: 'Tutorial passo-a-passo', value: 'Tutorial passo-a-passo. Numerado. Cada passo com 1 a 2 frases. Trechos de código quando fizer sentido.' },
+  ];
+
+  function selectTonePreset(val: string) {
+    if ($postStore.promptOverride === val) {
+      postStore.setPromptOverride('');
+    } else {
+      postStore.setPromptOverride(val);
+    }
   }
 
   function handleClearAll() {
@@ -42,12 +88,24 @@
     <div class="studio-field">
       <div class="studio-field-header">
         <label class="studio-label" for="guidelines-input">Diretrizes & tom de voz</label>
-        <span class="studio-optional">opcional</span>
+        <span class="studio-optional">opcional · escolha um preset ou escreva</span>
+      </div>
+      <div class="tone-presets-row">
+        {#each tonePresets as p}
+          <button 
+            type="button" 
+            class="tone-tag-btn {$postStore.promptOverride === p.value ? 'selected' : ''}" 
+            on:click={() => selectTonePreset(p.value)}
+          >
+            {p.label}
+          </button>
+        {/each}
       </div>
       <textarea 
         id="guidelines-input"
         class="studio-textarea" 
-        placeholder="Ex: Tom: casual, voz de engenheiro pragmático. Evitar jargão de marketing. Usar checklist."
+        style="margin-top: 8px;"
+        placeholder="Ou escreva seu próprio: tom de voz, regras de escrita, frases para evitar..."
         value={$postStore.promptOverride}
         on:input={(e) => postStore.setPromptOverride(e.currentTarget.value)}
         rows={4}
@@ -58,13 +116,24 @@
     <!-- Recent Suggested Topics -->
     <div class="studio-field">
       <div class="studio-field-header">
-        <label class="studio-label" for="suggested">Tópicos recentes</label>
+        <label class="studio-label" for="suggested">Tópicos sugeridos por I.A.</label>
+        <button type="button" class="refresh-topics-btn" on:click={fetchSuggestedTopics} disabled={loadingTopics}>
+          {#if loadingTopics}
+            <span class="mini-spinner inline-spinner"></span>
+          {:else}
+            <span>Atualizar ↻</span>
+          {/if}
+        </button>
         <span class="studio-optional">opcional</span>
       </div>
       <div class="recent-topics-row">
-        {#each recentTopics as t}
-          <button class="topic-tag-btn" on:click={() => selectRecentTopic(t)}>{t}</button>
-        {/each}
+        {#if loadingTopics && $postStore.recentTopics.length === 0}
+          <div class="topics-loader">Carregando sugestões da IA...</div>
+        {:else}
+          {#each $postStore.recentTopics as t}
+            <button class="topic-tag-btn" on:click={() => selectRecentTopic(t)}>{t}</button>
+          {/each}
+        {/if}
       </div>
     </div>
 
@@ -164,6 +233,14 @@
     margin-top: 4px;
   }
 
+  .tone-presets-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+    margin-bottom: 8px;
+  }
+
   .topic-tag-btn {
     font-size: 12px;
     color: var(--text-muted);
@@ -180,6 +257,30 @@
     background: var(--surface-hover);
     border-color: var(--border-strong);
     color: var(--text);
+  }
+
+  .tone-tag-btn {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 5px 10px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  }
+
+  .tone-tag-btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  .tone-tag-btn.selected {
+    background: var(--accent-muted);
+    border-color: rgba(163, 230, 53, 0.2);
+    color: var(--accent);
   }
 
   .token-info-badge {
@@ -299,5 +400,44 @@
     display: flex;
     gap: 8px;
     margin-top: 12px;
+  }
+
+  .refresh-topics-btn {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0 4px;
+    margin-left: 8px;
+    display: inline-flex;
+    align-items: center;
+    transition: color var(--transition-fast);
+  }
+
+  .refresh-topics-btn:hover {
+    color: var(--accent-hover, #bef264);
+  }
+
+  .refresh-topics-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .topics-loader {
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 5px 0;
+  }
+
+  .inline-spinner {
+    width: 10px;
+    height: 10px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: rotate 1s linear infinite;
+    display: inline-block;
   }
 </style>

@@ -341,11 +341,11 @@
     margin-bottom: 10px;
   }
 
-  .suggested-header .spark-icon {
+  .suggested-header :global(.spark-icon) {
     color: var(--accent);
   }
 
-  :global(.theme-light) .suggested-header .spark-icon {
+  :global(.theme-light) .suggested-header :global(.spark-icon) {
     color: var(--text-muted);
   }
 

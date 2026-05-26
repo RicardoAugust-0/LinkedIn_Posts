@@ -17,7 +17,7 @@ pub async fn start_scheduler(pool: SqlitePool) {
         
         // Buscar posts agendados que já passaram da hora de publicação
         let scheduled_posts_res = sqlx::query_as::<_, Post>(
-            "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id \
+            "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated \
              FROM posts WHERE status = ? AND scheduled_at <= ?"
         )
         .bind(PostStatus::Scheduled)

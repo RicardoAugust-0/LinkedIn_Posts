@@ -5,15 +5,9 @@
   import StepTopic from '../components/wizard/StepTopic.svelte';
   import StepMedia from '../components/wizard/StepMedia.svelte';
   import StepSchedule from '../components/wizard/StepSchedule.svelte';
-  import { createEventDispatcher, onMount } from 'svelte';
-
-  export let theme: 'dark' | 'light' = 'dark';
+  import { createEventDispatcher } from 'svelte';
 
   const dispatch = createEventDispatcher();
-
-  onMount(() => {
-    postStore.reset();
-  });
 
   function handleSaved() {
     dispatch('navigate', 'dashboard');

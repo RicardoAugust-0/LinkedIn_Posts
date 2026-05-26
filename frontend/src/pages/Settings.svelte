@@ -1,44 +1,99 @@
+<!-- frontend/src/pages/Settings.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { 
-    Save, Link, Link2Off, Eye, EyeOff, Check, Copy, ExternalLink,
-    AlertCircle, CheckCircle2, FileText, Info
+    Save, ExternalLink, AlertCircle, CheckCircle2, Check
   } from '@lucide/svelte';
-
-  export let theme: 'dark' | 'light' = 'dark';
+  import SettingsLinkedInProfile from '../components/settings/SettingsLinkedInProfile.svelte';
+  import SettingsAIKeys from '../components/settings/SettingsAIKeys.svelte';
+  import SettingsLinkedInCredentials from '../components/settings/SettingsLinkedInCredentials.svelte';
+  import SettingsAuthorContext from '../components/settings/SettingsAuthorContext.svelte';
+  import SettingsPreferences from '../components/settings/SettingsPreferences.svelte';
+  import SettingsAdvanced from '../components/settings/SettingsAdvanced.svelte';
+  import SettingsDiagnostics from '../components/settings/SettingsDiagnostics.svelte';
+  import SettingsHelp from '../components/settings/SettingsHelp.svelte';
 
   // Configurações
   let geminiKey = '';
-  let googleSearchKey = '';
-  let googleSearchCx = '';
+  let pexelsKey = '';
   let linkedinClientId = '';
   let linkedinClientSecret = '';
+  let userContext = '';
 
   let loading = true;
   let saving = false;
+  let testingAll = false;
   
   // Toasts
   let showSaveSuccess = false;
   let authSuccessMessage = false;
   let authErrorMessage = false;
+  let showSuccessToast = false;
+  let successToastMsg = "";
+  let showErrorToast = false;
+  let errorToastMsg = "";
+
+  function triggerSuccessToast(msg: string) {
+    successToastMsg = msg;
+    showSuccessToast = true;
+    setTimeout(() => showSuccessToast = false, 5000);
+  }
+
+  function triggerErrorToast(msg: string) {
+    errorToastMsg = msg;
+    showErrorToast = true;
+    setTimeout(() => showErrorToast = false, 6000);
+  }
+
+  let testResults: any = null;
+
+  async function testAllConnections() {
+    testingAll = true;
+    testResults = null;
+    try {
+      const res = await fetch('http://localhost:3000/api/settings/test-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gemini_key: geminiKey || null,
+          pexels_key: pexelsKey || null,
+          linkedin_client_id: linkedinClientId || null,
+          linkedin_client_secret: linkedinClientSecret || null
+        })
+      });
+
+      if (res.ok) {
+        testResults = await res.json();
+        const allSuccess = testResults.gemini?.success && testResults.pexels?.success && testResults.linkedin?.success;
+        if (allSuccess) {
+          triggerSuccessToast("Todas as conexões foram testadas e estão funcionando perfeitamente!");
+        } else {
+          triggerErrorToast("Alguns testes de conexão falharam. Veja os detalhes abaixo.");
+        }
+      } else {
+        triggerErrorToast("Erro ao conectar ao servidor de testes.");
+      }
+    } catch (e) {
+      console.error(e);
+      triggerErrorToast("Erro de rede ao testar conexões.");
+    } finally {
+      testingAll = false;
+    }
+  }
   
   // LinkedIn Auth Status
   let isAuthenticated = false;
+  let isSimulated = false;
   let expiresAt: string | null = null;
   let disconnecting = false;
 
-  // Toggle visibilidade da chave
-  let showGemini = false;
-  let showGoogle = false;
-  let showLinkedIn = false;
-
   // Preferências
-  let prefAiModel = 'gemini-1.5-flash';
+  let prefAiModel = 'gemini-2.5-flash';
   let prefCharLimit = 3000;
 
   // Avançado
-  let clearingDb = false;
   let activeAnchor = 'linkedin';
+  let clearingDb = false;
 
   onMount(async () => {
     loadPreferences();
@@ -64,10 +119,10 @@
       if (res.ok) {
         const data = await res.json();
         geminiKey = data.gemini_key || '';
-        googleSearchKey = data.google_search_key || '';
-        googleSearchCx = data.google_search_cx || '';
+        pexelsKey = data.pexels_key || '';
         linkedinClientId = data.linkedin_client_id || '';
         linkedinClientSecret = data.linkedin_client_secret || '';
+        userContext = data.user_context || '';
       }
     } catch (e) {
       console.error("Erro ao carregar configurações", e);
@@ -82,6 +137,7 @@
       if (res.ok) {
         const data = await res.json();
         isAuthenticated = data.authenticated;
+        isSimulated = data.simulated || false;
         expiresAt = data.expires_at ? new Date(data.expires_at).toLocaleDateString('pt-BR') : null;
       }
     } catch (e) {
@@ -98,10 +154,10 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           gemini_key: geminiKey || null,
-          google_search_key: googleSearchKey || null,
-          google_search_cx: googleSearchCx || null,
+          pexels_key: pexelsKey || null,
           linkedin_client_id: linkedinClientId || null,
-          linkedin_client_secret: linkedinClientSecret || null
+          linkedin_client_secret: linkedinClientSecret || null,
+          user_context: userContext || null
         })
       });
 
@@ -144,11 +200,6 @@
     } finally {
       disconnecting = false;
     }
-  }
-
-  function copyKeyToClipboard(text: string) {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
   }
 
   function loadPreferences() {
@@ -240,6 +291,18 @@
       <span>Configurações salvas com sucesso!</span>
     </div>
   {/if}
+  {#if showSuccessToast}
+    <div class="studio-toast studio-toast-success">
+      <CheckCircle2 size={16} />
+      <span>{successToastMsg}</span>
+    </div>
+  {/if}
+  {#if showErrorToast}
+    <div class="studio-toast studio-toast-error">
+      <AlertCircle size={16} />
+      <span>{errorToastMsg}</span>
+    </div>
+  {/if}
 </div>
 
 <div class="studio-page-body">
@@ -254,7 +317,6 @@
       <nav class="settings-anchors-nav">
         <button class="anchor-btn {activeAnchor === 'linkedin' ? 'active' : ''}" on:click={() => scrollToSection('linkedin')}>Conexão LinkedIn</button>
         <button class="anchor-btn {activeAnchor === 'keys' ? 'active' : ''}" on:click={() => scrollToSection('keys')}>Chaves de IA</button>
-        <button class="anchor-btn {activeAnchor === 'search' ? 'active' : ''}" on:click={() => scrollToSection('search')}>Busca de imagens</button>
         <button class="anchor-btn {activeAnchor === 'preferences' ? 'active' : ''}" on:click={() => scrollToSection('preferences')}>Preferências</button>
         <button class="anchor-btn {activeAnchor === 'advanced' ? 'active' : ''}" on:click={() => scrollToSection('advanced')}>Avançado</button>
         
@@ -268,212 +330,31 @@
       <!-- Right side cards column -->
       <div class="settings-cards-list">
         <!-- LinkedIn connection card -->
-        <section id="linkedin-section" class="studio-card settings-card">
-          <div class="card-title-row">
-            <div class="title-details">
-              <h2>Conexão LinkedIn</h2>
-              <p class="card-desc">Sua conta autorizada para publicar via API oficial do LinkedIn.</p>
-            </div>
-            
-            <span class="status-indicator-badge {isAuthenticated ? 'connected' : 'simulated'}">
-              <span class="status-dot"></span>
-              {isAuthenticated ? 'Ativo' : 'Simulador'}
-            </span>
-          </div>
-
-          <div class="connection-profile-row">
-            <div class="profile-avatar">RA</div>
-            <div class="profile-details">
-              <div class="profile-name">Ricardo Augusto</div>
-              <div class="profile-email">
-                {#if isAuthenticated}
-                  Conectado como ricardo@quill.dev
-                {:else}
-                  LinkedIn rodando em Modo de Simulação (Mock)
-                {/if}
-              </div>
-              
-              <div class="profile-meta-row">
-                <span>token: <span class="meta-highlight">{isAuthenticated ? '•••••••••fa92e' : 'mock_token'}</span></span>
-                <span>expira: <span class="meta-highlight">{expiresAt || 'Simulação sem expiração'}</span></span>
-                <span>escopo: <span class="meta-highlight">w_member_social</span></span>
-              </div>
-            </div>
-
-            <div class="profile-actions-wrapper" style="display: flex; gap: 8px;">
-              <button type="button" class="studio-btn studio-btn-secondary" on:click={startLinkedInAuth}>
-                {isAuthenticated ? 'Renovar token' : 'Conectar Conta'}
-              </button>
-              {#if isAuthenticated}
-                <button type="button" class="studio-btn studio-btn-danger" on:click={disconnectLinkedIn} disabled={disconnecting}>
-                  Desconectar
-                </button>
-              {/if}
-            </div>
-          </div>
-        </section>
+        <SettingsLinkedInProfile 
+          {isAuthenticated} 
+          {isSimulated}
+          {expiresAt} 
+          {disconnecting} 
+          on:connect={startLinkedInAuth} 
+          on:disconnect={disconnectLinkedIn} 
+        />
 
         <!-- Credentials forms card -->
         <section id="keys-section" class="studio-card settings-card">
-          <div class="card-title-row header-only">
-            <div class="title-details">
-              <h2>Chaves de IA</h2>
-              <p class="card-desc">Google AI Studio. Necessário para geração de textos (Gemini) e imagens (Imagen 3).</p>
-            </div>
-          </div>
-
           <form on:submit|preventDefault={saveSettings} class="settings-form">
-            <!-- Gemini Key input -->
-            <div class="studio-field">
-              <div class="studio-field-header">
-                <label class="studio-label" for="gemini-key">Gemini API Key</label>
-                <span class="status-indicator-inline {geminiKey ? 'valid' : 'empty'}">
-                  <span class="status-dot"></span>
-                  {geminiKey ? 'Verificada' : 'Ausente'}
-                </span>
-              </div>
-              <div class="key-input-container">
-                <input 
-                  id="gemini-key"
-                  type={showGemini ? "text" : "password"} 
-                  class="studio-input key-input-field" 
-                  bind:value={geminiKey}
-                  placeholder="Insira sua Gemini API Key"
-                />
-                <div class="key-actions-group">
-                  <button type="button" class="key-action-btn" on:click={() => showGemini = !showGemini}>
-                    {#if showGemini}<EyeOff size={13} />{:else}<Eye size={13} />{/if}
-                  </button>
-                  <button type="button" class="key-action-btn" on:click={() => copyKeyToClipboard(geminiKey)}>
-                    <Copy size={13} />
-                  </button>
-                </div>
-              </div>
-              <div class="studio-hint">Modelo utilizado: gemini-2.5-pro / Imagen 3.</div>
-            </div>
+            <SettingsAIKeys 
+              bind:geminiKey 
+              bind:pexelsKey 
+            />
 
-            <!-- Imagen 3 Key input (shares gemini key indicator) -->
-            <div class="studio-field">
-              <div class="studio-field-header">
-                <label class="studio-label" for="imagen-key">Imagen 3 API Key</label>
-                <span class="status-indicator-inline valid">
-                  <span class="status-dot"></span>
-                  Compartilha Gemini
-                </span>
-              </div>
-              <div class="key-input-container">
-                <input 
-                  id="imagen-key"
-                  type={showGemini ? "text" : "password"} 
-                  class="studio-input key-input-field" 
-                  value={geminiKey}
-                  placeholder="Usa a mesma chave do Gemini por padrão"
-                  disabled
-                />
-                <div class="key-actions-group">
-                  <button type="button" class="key-action-btn" on:click={() => showGemini = !showGemini}>
-                    {#if showGemini}<EyeOff size={13} />{:else}<Eye size={13} />{/if}
-                  </button>
-                </div>
-              </div>
-              <div class="studio-hint">Para geração de ilustrações no Wizard do post.</div>
-            </div>
+            <SettingsLinkedInCredentials 
+              bind:linkedinClientId 
+              bind:linkedinClientSecret 
+            />
 
-            <!-- Google Custom Search keys -->
-            <div id="search-section" class="card-title-row header-only inner-divider">
-              <div class="title-details">
-                <h2>Busca de imagens</h2>
-                <p class="card-desc">Google Custom Search Engine para a aba 'Buscar no Google' no criador de posts.</p>
-              </div>
-            </div>
-
-            <div class="keys-grid-row">
-              <div class="studio-field">
-                <div class="studio-field-header">
-                  <label class="studio-label" for="search-key">Google Search API Key</label>
-                  <span class="status-indicator-inline {googleSearchKey ? 'valid' : 'empty'}">
-                    <span class="status-dot"></span>
-                    {googleSearchKey ? 'Verificada' : 'Ausente'}
-                  </span>
-                </div>
-                <div class="key-input-container">
-                  <input 
-                    id="search-key"
-                    type={showGoogle ? "text" : "password"} 
-                    class="studio-input key-input-field" 
-                    bind:value={googleSearchKey}
-                    placeholder="Search API Key"
-                  />
-                  <div class="key-actions-group">
-                    <button type="button" class="key-action-btn" on:click={() => showGoogle = !showGoogle}>
-                      {#if showGoogle}<EyeOff size={13} />{:else}<Eye size={13} />{/if}
-                    </button>
-                    <button type="button" class="key-action-btn" on:click={() => copyKeyToClipboard(googleSearchKey)}>
-                      <Copy size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="studio-field">
-                <div class="studio-field-header">
-                  <label class="studio-label" for="search-cx">Search Engine ID (CX)</label>
-                  <span class="status-indicator-inline {googleSearchCx ? 'valid' : 'empty'}">
-                    <span class="status-dot"></span>
-                    {googleSearchCx ? 'Verificado' : 'Ausente'}
-                  </span>
-                </div>
-                <input 
-                  id="search-cx"
-                  type="text" 
-                  class="studio-input mono-text" 
-                  bind:value={googleSearchCx}
-                  placeholder="Ex: 017a4c8e9b..."
-                />
-              </div>
-            </div>
-
-            <!-- Client ID & Secret LinkedIn App -->
-            <div class="card-title-row header-only inner-divider">
-              <div class="title-details">
-                <h2>Credenciais LinkedIn Developer</h2>
-                <p class="card-desc">Necessário para publicar de verdade na sua conta. Caso contrário, roda em Simulação.</p>
-              </div>
-            </div>
-
-            <div class="keys-grid-row">
-              <div class="studio-field">
-                <label class="studio-label" for="linkedin-client">LinkedIn Client ID</label>
-                <input 
-                  id="linkedin-client"
-                  type="text" 
-                  class="studio-input" 
-                  bind:value={linkedinClientId}
-                  placeholder="Client ID da Developer App"
-                />
-              </div>
-
-              <div class="studio-field">
-                <label class="studio-label" for="linkedin-secret">LinkedIn Client Secret</label>
-                <div class="key-input-container">
-                  <input 
-                    id="linkedin-secret"
-                    type={showLinkedIn ? "text" : "password"} 
-                    class="studio-input key-input-field" 
-                    bind:value={linkedinClientSecret}
-                    placeholder="Client Secret"
-                  />
-                  <div class="key-actions-group">
-                    <button type="button" class="key-action-btn" on:click={() => showLinkedIn = !showLinkedIn}>
-                      {#if showLinkedIn}<EyeOff size={13} />{:else}<Eye size={13} />{/if}
-                    </button>
-                    <button type="button" class="key-action-btn" on:click={() => copyKeyToClipboard(linkedinClientSecret)}>
-                      <Copy size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <SettingsAuthorContext 
+              bind:userContext 
+            />
 
             <!-- Form Save Actions -->
             <div class="form-save-actions">
@@ -481,101 +362,38 @@
                 <Save size={12} />
                 <span>{saving ? 'Salvando...' : 'Salvar Configurações'}</span>
               </button>
-            </div>
-          </form>
-        </section>
 
-        <!-- Preferências Card -->
-        <section id="preferences-section" class="studio-card settings-card">
-          <div class="card-title-row header-only">
-            <div class="title-details">
-              <h2>Preferências do Sistema</h2>
-              <p class="card-desc">Personalize o comportamento do gerador de posts e do layout.</p>
-            </div>
-          </div>
-
-          <div class="settings-form" style="margin-top: 15px;">
-            <div class="keys-grid-row">
-              <div class="studio-field">
-                <label class="studio-label" for="pref-ai-model">Modelo de IA Padrão</label>
-                <select id="pref-ai-model" class="studio-input" bind:value={prefAiModel} on:change={savePreferences} style="width: 100%; height: 38px; padding: 0 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
-                  <option value="gemini-1.5-flash">Gemini 1.5 Flash (Rápido e Conciso)</option>
-                  <option value="gemini-1.5-pro">Gemini 1.5 Pro (Criativo e Detalhado)</option>
-                </select>
-              </div>
-
-              <div class="studio-field">
-                <label class="studio-label" for="pref-char-limit">Aviso de Limite de Caracteres</label>
-                <input 
-                  id="pref-char-limit"
-                  type="number" 
-                  class="studio-input" 
-                  bind:value={prefCharLimit} 
-                  on:input={savePreferences}
-                  min="500" 
-                  max="10000"
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Configurações Avançadas Card -->
-        <section id="advanced-section" class="studio-card settings-card">
-          <div class="card-title-row header-only">
-            <div class="title-details">
-              <h2>Configurações Avançadas</h2>
-              <p class="card-desc">Operações críticas do sistema e diagnósticos do banco de dados.</p>
-            </div>
-          </div>
-
-          <div class="advanced-workspace">
-            <div class="db-diagnostics-row">
-              <div class="diagnostic-item">
-                <span class="diagnostic-label">Status da Conexão:</span>
-                <span class="diagnostic-val active">
-                  <span class="status-dot"></span>
-                  Conectado (SQLite)
-                </span>
-              </div>
-              <div class="diagnostic-item" style="margin-top: 8px;">
-                <span class="diagnostic-label">Arquivo do Banco:</span>
-                <span class="diagnostic-val font-mono">sqlite:posts.db</span>
-              </div>
-            </div>
-
-            <div class="danger-zone-divider">Zona de Risco</div>
-            
-            <div class="danger-action-row">
-              <div class="danger-action-details">
-                <h4>Limpar Banco de Dados</h4>
-                <p>Exclui permanentemente todas as publicações (rascunhos, agendados e publicados) do banco de dados local. Esta ação não pode ser desfeita.</p>
-              </div>
-              <button type="button" class="studio-btn studio-btn-danger" on:click={clearDatabase} disabled={clearingDb}>
-                {#if clearingDb}
-                  <span>Limpando...</span>
+              <button type="button" class="studio-btn studio-btn-secondary" on:click={testAllConnections} disabled={testingAll || saving}>
+                {#if testingAll}
+                  <span class="mini-spinner"></span>
+                  <span>Testando conexões...</span>
                 {:else}
-                  <span>Excluir todos os posts</span>
+                  <Check size={12} />
+                  <span>Testar todas as conexões</span>
                 {/if}
               </button>
             </div>
-          </div>
+          </form>
+
+          <!-- Diagnóstico das Conexões Panel -->
+          <SettingsDiagnostics {testResults} on:close={() => testResults = null} />
         </section>
 
+        <!-- Preferências Card -->
+        <SettingsPreferences 
+          bind:prefAiModel 
+          bind:prefCharLimit 
+          on:change={savePreferences} 
+        />
+
+        <!-- Configurações Avançadas Card -->
+        <SettingsAdvanced 
+          {clearingDb} 
+          on:clearDb={clearDatabase} 
+        />
+
         <!-- Help Documentation Card -->
-        <section class="studio-card developer-help-card">
-          <div class="help-card-header">
-            <Info size={16} class="info-icon" />
-            <h3>Como conectar de verdade à API do LinkedIn?</h3>
-          </div>
-          <p class="help-card-desc">Para que suas publicações cheguem à sua conta pessoal do LinkedIn, siga o passo a passo abaixo:</p>
-          <ol class="help-steps-list">
-            <li>Crie uma conta de desenvolvedor em <a href="https://developer.linkedin.com" target="_blank" rel="noopener noreferrer">LinkedIn Developer Portal</a>.</li>
-            <li>Crie um novo aplicativo e solicite o produto de publicação <strong>Share on LinkedIn</strong> (escopo <code>w_member_social</code>).</li>
-            <li>Nas configurações do App do LinkedIn, registre o endereço callback autorizado: <code class="code-highlight">http://localhost:3000/api/auth/linkedin/callback</code>.</li>
-            <li>Insira o Client ID e Client Secret gerados no formulário acima, clique em Salvar e depois clique em "Conectar Conta" no primeiro painel.</li>
-          </ol>
-        </section>
+        <SettingsHelp />
       </div>
     </div>
   {/if}
@@ -679,143 +497,6 @@
     flex-direction: column;
   }
 
-  .card-title-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .card-title-row.header-only {
-    border-bottom: none;
-    padding-bottom: 8px;
-  }
-
-  .card-title-row.inner-divider {
-    border-top: 1px solid var(--border);
-    padding-top: 20px;
-    margin-top: 8px;
-  }
-
-  .title-details {
-    flex: 1;
-  }
-
-  .card-desc {
-    font-size: 12.5px;
-    color: var(--text-muted);
-    margin-top: 4px;
-    line-height: 1.45;
-  }
-
-  /* Status Badge Indicator */
-  .status-indicator-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 99px;
-    font-size: 11.5px;
-    font-weight: 500;
-    border: 1px solid transparent;
-  }
-
-  .status-indicator-badge .status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-  }
-
-  .status-indicator-badge.connected {
-    background: var(--accent-muted);
-    color: var(--accent);
-    border-color: rgba(163, 230, 53, 0.2);
-  }
-  .status-indicator-badge.connected .status-dot {
-    background-color: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
-  }
-
-  .status-indicator-badge.simulated {
-    background: rgba(251, 191, 36, 0.08);
-    color: var(--amber);
-    border-color: rgba(251, 191, 36, 0.15);
-  }
-  .status-indicator-badge.simulated .status-dot {
-    background-color: var(--amber);
-  }
-
-  /* Connection Profile Row */
-  .connection-profile-row {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    padding-top: 16px;
-  }
-
-  @media (max-width: 640px) {
-    .connection-profile-row {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 14px;
-    }
-  }
-
-  .profile-avatar {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--avatar-a), var(--avatar-b));
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 20.16px;
-    letter-spacing: -0.02em;
-    flex-shrink: 0;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
-  }
-
-  .profile-details {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .profile-name {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .profile-email {
-    font-size: 12.5px;
-    color: var(--text-muted);
-    margin-top: 3px;
-  }
-
-  .profile-meta-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 18px;
-    font-size: 11px;
-    color: var(--text-dim);
-    font-family: var(--font-mono);
-    margin-top: 10px;
-  }
-
-  .meta-highlight {
-    color: var(--text);
-  }
-
-  .profile-actions-wrapper {
-    display: flex;
-    gap: 8px;
-  }
-
-  /* Form & Key fields */
   .settings-form {
     display: flex;
     flex-direction: column;
@@ -823,157 +504,28 @@
     margin-top: 12px;
   }
 
-  .status-indicator-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11.5px;
-  }
-
-  .status-indicator-inline .status-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-  }
-
-  .status-indicator-inline.valid {
-    color: var(--accent);
-  }
-  .status-indicator-inline.valid .status-dot {
-    background-color: var(--accent);
-  }
-
-  .status-indicator-inline.empty {
-    color: var(--text-dim);
-  }
-  .status-indicator-inline.empty .status-dot {
-    background-color: var(--border-strong);
-  }
-
-  .key-input-container {
-    display: flex;
-    align-items: center;
-    background: var(--bg-inset);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    overflow: hidden;
-  }
-
-  .key-input-field {
-    flex: 1;
-    min-width: 0;
-    border: none;
-    background: transparent;
-    padding: 10px 12px;
-    font-family: var(--font-mono);
-    font-size: 12.5px;
-    color: var(--text);
-    outline: none;
-  }
-
-  .key-actions-group {
-    display: flex;
-    gap: 0;
-    padding: 4px;
-    border-left: 1px solid var(--border);
-    background: var(--surface-alt);
-  }
-
-  .key-action-btn {
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color var(--transition-fast), color var(--transition-fast);
-  }
-
-  .key-action-btn:hover {
-    background-color: var(--surface-hover);
-    color: var(--text);
-  }
-
-  .keys-grid-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-  }
-
-  @media (max-width: 640px) {
-    .keys-grid-row {
-      grid-template-columns: 1fr;
-    }
-  }
-
   .form-save-actions {
     display: flex;
     align-items: center;
     justify-content: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
     padding-top: 14px;
     border-top: 1px solid var(--border);
   }
 
-  /* Help integrations card */
-  .developer-help-card {
-    background: rgba(255, 255, 255, 0.01);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
+  /* Mini spinner */
+  .mini-spinner {
+    width: 12px;
+    height: 12px;
+    border: 1.5px solid var(--border-strong);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
   }
 
-  .help-card-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text);
-    margin-bottom: 8px;
-  }
-
-  .help-card-header .info-icon {
-    color: var(--text-muted);
-  }
-
-  .help-card-desc {
-    font-size: 12.5px;
-    color: var(--text-muted);
-    line-height: 1.45;
-    margin-bottom: 12px;
-  }
-
-  .help-steps-list {
-    font-size: 12px;
-    color: var(--text-muted);
-    padding-left: 18px;
-    line-height: 1.6;
-  }
-
-  .help-steps-list li {
-    margin-bottom: 6px;
-  }
-
-  .help-steps-list a {
-    color: var(--text);
-    font-weight: 500;
-    text-decoration: underline;
-  }
-
-  .help-steps-list a:hover {
-    color: var(--accent);
-  }
-
-  .code-highlight {
-    background: var(--surface-alt);
-    border: 1px solid var(--border);
-    padding: 1px 5px;
-    border-radius: 4px;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--text);
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   /* Loader */
@@ -982,127 +534,24 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
-    color: var(--text-muted);
-  }
-
-  .spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--border);
-    border-right-color: var(--text);
-    border-radius: 50%;
-    animation: rotate 1s linear infinite;
+    justify-content: center;
+    gap: 12px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: var(--surface);
   }
 
   .loader-text {
     font-size: 13.5px;
-  }
-
-  @keyframes rotate {
-    to { transform: rotate(360deg); }
-  }
-
-  /* Advanced & Preferences styling */
-  .advanced-workspace {
-    margin-top: 15px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .db-diagnostics-row {
-    background: var(--bg-inset);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-  }
-
-  .diagnostic-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 13px;
-  }
-
-  .diagnostic-label {
     color: var(--text-muted);
   }
 
-  .diagnostic-val {
-    color: var(--text);
-  }
-
-  .diagnostic-val.active {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--accent);
-    font-weight: 500;
-  }
-  
-  :global(.theme-light) .diagnostic-val.active {
-    color: #3f6212;
-  }
-
-  .diagnostic-val.active .status-dot {
-    width: 6px;
-    height: 6px;
+  .spinner {
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--border-strong);
+    border-top-color: var(--accent);
     border-radius: 50%;
-    background-color: var(--accent);
-  }
-  
-  :global(.theme-light) .diagnostic-val.active .status-dot {
-    background-color: #3f6212;
-  }
-
-  .danger-zone-divider {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    text-transform: uppercase;
-    color: var(--rose);
-    letter-spacing: 0.08em;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 8px;
-  }
-
-  .danger-zone-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--rose-muted);
-  }
-
-  .danger-action-row {
-    border: 1px solid var(--rose-muted);
-    background: rgba(251, 113, 133, 0.02);
-    border-radius: 8px;
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-  }
-
-  @media (max-width: 640px) {
-    .danger-action-row {
-      flex-direction: column;
-      align-items: start;
-    }
-  }
-
-  .danger-action-details h4 {
-    font-size: 14.5px;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 4px;
-  }
-
-  .danger-action-details p {
-    font-size: 12.5px;
-    color: var(--text-muted);
-    line-height: 1.45;
+    animation: spin 0.8s linear infinite;
   }
 </style>

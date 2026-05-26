@@ -3,11 +3,12 @@
   import Sidebar from './components/Sidebar.svelte';
   import Dashboard from './pages/Dashboard.svelte';
   import CreatePost from './pages/CreatePost.svelte';
+  import Automation from './pages/Automation.svelte';
   import Settings from './pages/Settings.svelte';
   import SearchModal from './components/SearchModal.svelte';
 
   // Gerenciamento de rotas/páginas simples
-  let activePage: 'dashboard' | 'create' | 'settings' = 'dashboard';
+  let activePage: 'dashboard' | 'create' | 'settings' | 'automation' = 'dashboard';
   let theme: 'dark' | 'light' = 'dark';
   let showSearchModal = false;
   let searchSelectedPostId: string | null = null;
@@ -18,6 +19,11 @@
       theme = storedTheme;
     }
     applyTheme();
+
+    const storedPage = localStorage.getItem('quill-active-page');
+    if (storedPage === 'dashboard' || storedPage === 'create' || storedPage === 'settings' || storedPage === 'automation') {
+      activePage = storedPage;
+    }
   });
 
   function applyTheme() {
@@ -35,9 +41,10 @@
   }
 
   // Tratar navegação
-  function handleNavigate(event: CustomEvent<'dashboard' | 'create' | 'settings'> | any) {
+  function handleNavigate(event: CustomEvent<'dashboard' | 'create' | 'settings' | 'automation'> | any) {
     const targetPage = event.detail !== undefined ? event.detail : event;
     activePage = targetPage;
+    localStorage.setItem('quill-active-page', targetPage);
   }
 
   // Ouvir atalhos de teclado (⌘K ou Ctrl+K) para abrir busca
@@ -68,21 +75,21 @@
   <main class="main-content">
     {#if activePage === 'dashboard'}
       <Dashboard 
-        theme={theme} 
         on:navigate={handleNavigate} 
         selectedPostId={searchSelectedPostId} 
       />
     {:else if activePage === 'create'}
-      <CreatePost theme={theme} />
+      <CreatePost />
+    {:else if activePage === 'automation'}
+      <Automation on:navigate={handleNavigate} />
     {:else if activePage === 'settings'}
-      <Settings theme={theme} />
+      <Settings />
     {/if}
   </main>
 </div>
 
 <SearchModal 
   show={showSearchModal} 
-  theme={theme} 
   on:close={() => showSearchModal = false}
   on:select={handleSelectPostFromSearch}
 />
