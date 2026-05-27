@@ -175,7 +175,8 @@
   }
 
   function startLinkedInAuth() {
-    window.location.href = `${API_URL}/api/auth/linkedin`;
+    const redirectUrl = encodeURIComponent(window.location.origin);
+    window.location.href = `${API_URL}/api/auth/linkedin?redirect_url=${redirectUrl}`;
   }
 
   async function disconnectLinkedIn() {

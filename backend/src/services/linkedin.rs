@@ -46,7 +46,7 @@ pub async fn get_auth_status(pool: &SqlitePool) -> Result<AuthStatusResponse, Ap
     })
 }
 
-pub async fn get_authorization_url(pool: &SqlitePool, public_url: &str) -> Result<Option<String>, AppError> {
+pub async fn get_authorization_url(pool: &SqlitePool, public_url: &str, state: &str) -> Result<Option<String>, AppError> {
     let settings = sqlx::query_as::<_, Settings>(
         "SELECT id, gemini_key, google_search_key, google_search_cx, linkedin_client_id, linkedin_client_secret, linkedin_access_token, linkedin_access_token_expires, pexels_key, user_context FROM settings WHERE id = 1"
     )
@@ -59,14 +59,15 @@ pub async fn get_authorization_url(pool: &SqlitePool, public_url: &str) -> Resul
     };
 
     let redirect_uri = format!("{}/api/auth/linkedin/callback", public_url);
+    let state_param = if state.is_empty() { "linkedin_auth_state" } else { state };
     let auth_url = format!(
         "https://www.linkedin.com/oauth/v2/authorization?\
         response_type=code&\
         client_id={}&\
         redirect_uri={}&\
-        state=linkedin_auth_state&\
+        state={}&\
         scope=w_member_social%20openid%20profile%20email",
-        client_id, redirect_uri
+        client_id, redirect_uri, state_param
     );
 
     Ok(Some(auth_url))
