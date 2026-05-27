@@ -20,9 +20,22 @@
     }
     applyTheme();
 
-    const storedPage = localStorage.getItem('quill-active-page');
-    if (storedPage === 'dashboard' || storedPage === 'create' || storedPage === 'settings' || storedPage === 'automation') {
-      activePage = storedPage;
+    // Check URL path first for direct routing (e.g. from OAuth redirects or direct navigation)
+    const path = window.location.pathname;
+    if (path.includes('/settings')) {
+      activePage = 'settings';
+      localStorage.setItem('quill-active-page', 'settings');
+    } else if (path.includes('/create')) {
+      activePage = 'create';
+      localStorage.setItem('quill-active-page', 'create');
+    } else if (path.includes('/automation')) {
+      activePage = 'automation';
+      localStorage.setItem('quill-active-page', 'automation');
+    } else {
+      const storedPage = localStorage.getItem('quill-active-page');
+      if (storedPage === 'dashboard' || storedPage === 'create' || storedPage === 'settings' || storedPage === 'automation') {
+        activePage = storedPage;
+      }
     }
   });
 
