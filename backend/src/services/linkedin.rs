@@ -209,7 +209,8 @@ pub async fn publish_post(
     if let Some(img_url) = &post.image_url {
         let image_bytes = if img_url.starts_with("/uploads/") {
             let file_name = img_url.trim_start_matches("/uploads/");
-            let file_path = format!("uploads/{}", file_name);
+            let uploads_dir = std::env::var("UPLOADS_DIR").unwrap_or_else(|_| "uploads".to_string());
+            let file_path = format!("{}/{}", uploads_dir, file_name);
             fs::read(&file_path).ok()
         } else if img_url.starts_with("http") {
             info!("Baixando imagem externa do Google Search para upload no LinkedIn: {}", img_url);

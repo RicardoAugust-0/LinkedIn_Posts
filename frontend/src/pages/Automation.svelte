@@ -161,7 +161,7 @@
     generating = true;
     try {
       // 1. Chamar o backend para gerar os tópicos
-      const topicsRes = await fetch(`${API_URL}/api/generate/topics?seed=${encodeURIComponent(topicSeed)}`);
+      const topicsRes = await fetch(`${API_URL}/api/generate/topics?seed=${encodeURIComponent(topicSeed)}&quantity=${quantity}`);
       if (!topicsRes.ok) throw new Error("Falha ao sugerir tópicos de IA.");
       const topics = await topicsRes.json();
 
@@ -172,7 +172,7 @@
       const clearRes = await fetch(`${API_URL}/api/posts?automated=true`, { method: 'DELETE' });
       if (!clearRes.ok) throw new Error("Falha ao reiniciar banco de dados.");
 
-      // 2. Para cada tópico, gerar o texto do post
+      // 2. Para cada tópico, gerar o texto do post e a imagem correspondente
       let generatedCount = 0;
       for (const topic of targetTopics) {
         // Chamar o backend para gerar o texto do post
@@ -188,7 +188,26 @@
         if (textRes.ok) {
           const generatedData = await textRes.json();
           
-          // Criar rascunho no banco com o texto gerado
+          // Gerar imagem com IA para o post
+          let imageUrl: string | null = null;
+          let imageSource = 'none';
+          try {
+            const imgPrompt = `Professional futuristic technology illustration depicting ${topic}, 3d render digital art, corporate color palette, clean vector style`;
+            const imageRes = await fetch(`${API_URL}/api/generate/image`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: imgPrompt })
+            });
+            if (imageRes.ok) {
+              const imgData = await imageRes.json();
+              imageUrl = imgData.image_url;
+              imageSource = 'ai';
+            }
+          } catch (imgErr) {
+            console.error("Falha ao gerar imagem para o tópico: " + topic, imgErr);
+          }
+          
+          // Criar rascunho no banco com o texto e imagem gerados
           const createRes = await fetch(`${API_URL}/api/posts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -196,8 +215,8 @@
               title: generatedData.title,
               topic: topic,
               content: generatedData.content,
-              image_url: null,
-              image_source: 'none',
+              image_url: imageUrl,
+              image_source: imageSource,
               status: 'draft',
               scheduled_at: null,
               is_automated: true

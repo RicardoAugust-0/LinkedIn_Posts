@@ -21,9 +21,11 @@
 
 <div class="studio-page-header">
   <div class="studio-page-header-info">
-    <div class="studio-eyebrow">Novo post</div>
+    <div class="studio-eyebrow">
+      {#if $postStore.editingPostId}Editar post{:else}Novo post{/if}
+    </div>
     <h1>
-      Criar com IA <span class="header-divider">—</span> <span class="header-step">{['Tópico & Texto','Mídia do post','Revisão & Agendamento'][$postStore.step-1]}</span>
+      {#if $postStore.editingPostId}Editar Publicação{:else}Criar com IA{/if} <span class="header-divider">—</span> <span class="header-step">{['Tópico & Texto','Mídia do post','Revisão & Agendamento'][$postStore.step-1]}</span>
     </h1>
   </div>
   

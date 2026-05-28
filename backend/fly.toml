@@ -15,6 +15,7 @@ primary_region = 'iad'
   HOST = '0.0.0.0'
   PORT = '3000'
   PUBLIC_URL = 'https://linkedmaker.fly.dev'
+  UPLOADS_DIR = '/data/uploads'
 
 [[mounts]]
   source = 'posts_data'

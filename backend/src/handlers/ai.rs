@@ -1,5 +1,5 @@
 // backend/src/handlers/ai.rs
-use axum::{extract::State, Json};
+use axum::{extract::{State, Query}, Json};
 use sqlx::SqlitePool;
 use crate::domain::models::{CreatePostRequest, GenerateImageRequest, ImprovePostRequest, ImprovePostResponse};
 use crate::domain::errors::AppError;
@@ -28,10 +28,17 @@ pub async fn generate_image(
     Ok(Json(result))
 }
 
+#[derive(serde::Deserialize)]
+pub struct SuggestTopicsQuery {
+    pub seed: Option<String>,
+    pub quantity: Option<i32>,
+}
+
 pub async fn suggest_topics(
     State(pool): State<SqlitePool>,
+    Query(query): Query<SuggestTopicsQuery>,
 ) -> Result<Json<Vec<String>>, AppError> {
-    let result = service_suggest_topics(&pool).await?;
+    let result = service_suggest_topics(&pool, query.seed, query.quantity).await?;
     Ok(Json(result))
 }
 

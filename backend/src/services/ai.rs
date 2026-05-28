@@ -122,12 +122,14 @@ pub async fn generate_text(
     3. Use um tom de conversa natural e de bastidores (pessoal e direto). Fale em primeira pessoa ('eu' ou 'nós'). \
     4. Use pouquíssimos emojis (no máximo 2 ou 3) para não parecer spam comercial. \
     5. Termine com uma pergunta curta de engajamento e no máximo 3 a 4 hashtags relevantes no final. \
-    6. Não use cabeçalhos artificiais (como 'Post:', 'Título:', etc.). Retorne apenas o texto final pronto.".to_string();
+    6. Não use cabeçalhos artificiais (como 'Post:', 'Título:', etc.). Retorne apenas o texto final pronto. \
+    7. EVITE REPETIÇÕES: Não use frases de abertura clichês ou repetitivas como 'Recentemente tenho explorado...', 'Nos últimos tempos...', 'No ecossistema de...'. Comece diretamente com uma reflexão, um fato, uma provocação ou um aprendizado prático. \
+    8. NÃO EXAGERE NO PERFIL/BIOGRAFIA: Não liste suas experiências, cargo atual, tempo de carreira ou histórico profissional em todos os posts. O contexto do autor serve APENAS para ajustar o tom de voz, estilo técnico e vocabulário. Não faça autopromoção explícita ou repetida das mesmas informações biográficas.".to_string();
 
     if let Some(ref context) = settings.user_context {
         if !context.trim().is_empty() {
             system_instruction.push_str(&format!(
-                "\n\nCONTEXTO DO AUTOR (Escreva o post incorporando a personalidade, experiências, tom de voz e vivência descritos abaixo):\n{}",
+                "\n\nCONTEXTO DO AUTOR (Use este contexto APENAS para alinhar a personalidade, tom de voz e estilo técnico. NÃO repita esses detalhes biográficos no post):\n{}",
                 context.trim()
             ));
         }
@@ -143,7 +145,12 @@ pub async fn generate_text(
             "parts": [{
                 "text": prompt
             }]
-        }]
+        }],
+        "generationConfig": {
+            "temperature": 0.8,
+            "topP": 0.95,
+            "topK": 40
+        }
     });
 
     info!("Enviando solicitação de geração de texto para o Gemini para o tema: {}", topic);
@@ -192,14 +199,15 @@ pub async fn generate_image(
     let has_key = settings.gemini_key.is_some() && !settings.gemini_key.as_ref().unwrap().trim().is_empty();
 
     // Criar pasta de uploads se não existir
-    fs::create_dir_all("uploads").ok();
+    let uploads_dir = std::env::var("UPLOADS_DIR").unwrap_or_else(|_| "uploads".to_string());
+    fs::create_dir_all(&uploads_dir).ok();
 
     if !has_key || prompt.to_lowercase().contains("mock") {
         info!("Rodando geração de imagem no modo Simulação (Mock).");
         tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
 
         let mock_image_id = Uuid::new_v4().to_string();
-        let file_path = format!("uploads/{}.jpg", mock_image_id);
+        let file_path = format!("{}/{}.jpg", uploads_dir, mock_image_id);
         
         let client = reqwest::Client::new();
         // Baixar imagem do picsum
@@ -263,7 +271,7 @@ pub async fn generate_image(
         .map_err(|e| AppError::Internal(format!("Erro ao decodificar imagem base64: {}", e)))?;
 
     let image_uuid = Uuid::new_v4().to_string();
-    let file_path = format!("uploads/{}.jpg", image_uuid);
+    let file_path = format!("{}/{}.jpg", uploads_dir, image_uuid);
     
     fs::write(&file_path, &image_bytes)
         .map_err(|e| AppError::Internal(format!("Erro ao salvar arquivo de imagem gerada: {}", e)))?;
@@ -276,6 +284,8 @@ pub async fn generate_image(
 
 pub async fn suggest_topics(
     pool: &SqlitePool,
+    seed: Option<String>,
+    quantity: Option<i32>,
 ) -> Result<Vec<String>, AppError> {
     // Carregar configurações
     let settings = sqlx::query_as::<_, Settings>(
@@ -285,15 +295,40 @@ pub async fn suggest_topics(
     .await?;
 
     let has_key = settings.gemini_key.is_some() && !settings.gemini_key.as_ref().unwrap().trim().is_empty();
+    let count = quantity.unwrap_or(4);
 
     if !has_key {
         info!("Rodando sugestão de tópicos no modo Simulação (Mock).");
-        return Ok(vec![
+        let base_topics = vec![
             "Rust 1.95 e const generics".to_string(),
             "Edge runtime migrations".to_string(),
             "Liderança técnica pragmática".to_string(),
             "Burnout em times de produto".to_string(),
-        ]);
+            "Arquitetura de microsserviços resilientes".to_string(),
+            "Boas práticas com SQLx e SQLite".to_string(),
+            "O futuro do serverless e edge computing".to_string(),
+            "Desenvolvimento dirigido a testes em Rust".to_string(),
+            "Gerenciamento de estado fino em frontend".to_string(),
+            "Como reduzir a latência de APIs críticas".to_string(),
+        ];
+        
+        let mut mock_topics = Vec::new();
+        let topic_seed = seed.as_deref().unwrap_or("tecnologia").to_lowercase();
+        
+        for base in &base_topics {
+            if mock_topics.len() >= count as usize {
+                break;
+            }
+            mock_topics.push(base.clone());
+        }
+        
+        let mut index = 1;
+        while mock_topics.len() < count as usize {
+            mock_topics.push(format!("Tópico extra {} sobre {}", index, topic_seed));
+            index += 1;
+        }
+
+        return Ok(mock_topics);
     }
 
     let api_key = settings.gemini_key.ok_or_else(|| AppError::Gemini("Gemini API Key ausente".to_string()))?;
@@ -303,7 +338,14 @@ pub async fn suggest_topics(
         model, api_key
     );
 
-    let prompt = "Gere uma lista de exatamente 4 ideias de tópicos curtos e muito engajadores para postagens de LinkedIn de tecnologia, engenharia de software e arquitetura. Retorne apenas as ideias de tópicos, uma por linha, sem numeração, explicações, aspas ou cabeçalhos.";
+    let topic_seed = seed.unwrap_or_else(|| "tecnologia, engenharia de software e arquitetura".to_string());
+    let prompt = format!(
+        "Você é um estrategista de conteúdo para o LinkedIn. \
+        Gere uma lista de exatamente {} ideias de tópicos curtos, específicos e muito engajadores para postagens no LinkedIn baseados no seguinte tema ou semente: '{}'. \
+        Cada tópico deve abordar um sub-tema diferente, prático e interessante para evitar repetição. \
+        Retorne apenas as ideias de tópicos, uma por linha, sem numeração, explicações, aspas ou cabeçalhos.",
+        count, topic_seed
+    );
 
     let body = serde_json::json!({
         "contents": [{
@@ -336,7 +378,7 @@ pub async fn suggest_topics(
         .ok_or_else(|| AppError::Gemini("A API do Gemini retornou uma resposta sem texto estruturado.".to_string()))?;
 
     // Dividir as linhas e limpar
-    let topics: Vec<String> = generated_text
+    let mut topics: Vec<String> = generated_text
         .lines()
         .map(|line| {
             let trimmed = line.trim();
@@ -344,16 +386,22 @@ pub async fn suggest_topics(
             without_num.trim_matches('"').trim().to_string()
         })
         .filter(|line| !line.is_empty())
-        .take(4)
+        .take(count as usize)
         .collect();
 
     if topics.is_empty() {
-        return Ok(vec![
+        let base_topics = vec![
             "Rust 1.95 e const generics".to_string(),
             "Edge runtime migrations".to_string(),
             "Liderança técnica pragmática".to_string(),
             "Burnout em times de produto".to_string(),
-        ]);
+        ];
+        for base in base_topics {
+            if topics.len() >= count as usize {
+                break;
+            }
+            topics.push(base);
+        }
     }
 
     Ok(topics)

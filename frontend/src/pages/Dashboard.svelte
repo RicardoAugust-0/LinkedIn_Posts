@@ -9,6 +9,7 @@
   import DashboardToolbar from '../components/dashboard/DashboardToolbar.svelte';
   import DashboardPostItem from '../components/dashboard/DashboardPostItem.svelte';
   import DashboardPostDetails from '../components/dashboard/DashboardPostDetails.svelte';
+  import { postStore } from '../lib/stores/postStore';
 
   export let selectedPostId: string | null = null;
 
@@ -244,6 +245,13 @@
   const dispatch = createEventDispatcher();
   
   function triggerCreate() {
+    postStore.reset();
+    dispatch('navigate', 'create');
+  }
+
+  function handleEditPost(event: CustomEvent<any>) {
+    const post = event.detail;
+    postStore.loadPost(post);
     dispatch('navigate', 'create');
   }
 </script>
@@ -330,6 +338,7 @@
       <DashboardPostDetails 
         {selectedPost}
         {getPostEngagement}
+        on:edit={handleEditPost}
       />
     </div>
   {/if}

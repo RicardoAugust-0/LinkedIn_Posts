@@ -21,6 +21,10 @@
   let linkedinClientSecret = '';
   let userContext = '';
 
+  // Valores iniciais salvos para verificar se há alterações pendentes
+  let initialLinkedinClientId = '';
+  let initialLinkedinClientSecret = '';
+
   let loading = true;
   let saving = false;
   let testingAll = false;
@@ -124,6 +128,9 @@
         linkedinClientId = data.linkedin_client_id || '';
         linkedinClientSecret = data.linkedin_client_secret || '';
         userContext = data.user_context || '';
+        
+        initialLinkedinClientId = linkedinClientId;
+        initialLinkedinClientSecret = linkedinClientSecret;
       }
     } catch (e) {
       console.error("Erro ao carregar configurações", e);
@@ -166,6 +173,8 @@
         showSaveSuccess = true;
         setTimeout(() => showSaveSuccess = false, 3000);
         await checkAuthStatus(); // Recarregar em caso de chaves alteradas
+        initialLinkedinClientId = linkedinClientId;
+        initialLinkedinClientSecret = linkedinClientSecret;
       }
     } catch (e) {
       console.error("Erro ao salvar configurações", e);
@@ -175,6 +184,19 @@
   }
 
   function startLinkedInAuth() {
+    const isDirty = (linkedinClientId !== initialLinkedinClientId) || (linkedinClientSecret !== initialLinkedinClientSecret);
+    
+    if (isDirty) {
+      alert("Atenção: Você alterou o Client ID ou Client Secret do LinkedIn mas não salvou. Por favor, clique em 'Salvar Configurações' na parte inferior da página antes de conectar a conta.");
+      return;
+    }
+
+    if (!linkedinClientId.trim() || !linkedinClientSecret.trim()) {
+      if (!confirm("Aviso: O Client ID e o Client Secret do LinkedIn estão vazios. Ao continuar, você se conectará no 'Modo de Simulação' (ideal para testes locais sem chaves reais). Deseja prosseguir com a simulação?")) {
+        return;
+      }
+    }
+
     const redirectUrl = encodeURIComponent(window.location.origin);
     window.location.href = `${API_URL}/api/auth/linkedin?redirect_url=${redirectUrl}`;
   }

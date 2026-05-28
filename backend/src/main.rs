@@ -65,7 +65,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Configurações carregadas: Host={}, Port={}", config.host, config.port);
 
     // Inicializar diretório de uploads
-    fs::create_dir_all("uploads")?;
+    let uploads_dir = std::env::var("UPLOADS_DIR").unwrap_or_else(|_| "uploads".to_string());
+    fs::create_dir_all(&uploads_dir)?;
 
     // Inicializar banco de dados
     let pool = init_db(&config.database_url).await?;
@@ -113,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         
         // Servir imagens geradas localmente
-        .nest_service("/uploads", ServeDir::new("uploads"))
+        .nest_service("/uploads", ServeDir::new(&uploads_dir))
         
         // Middlewares
         .layer(cors)

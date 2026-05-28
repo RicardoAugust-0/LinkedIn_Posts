@@ -24,6 +24,7 @@ export interface PostState {
   errorMsg: string | null;
   successMsg: string | null;
   recentTopics: string[];
+  editingPostId: string | null;
 }
 
 const initialState: PostState = {
@@ -48,6 +49,7 @@ const initialState: PostState = {
   errorMsg: null,
   successMsg: null,
   recentTopics: [],
+  editingPostId: null,
 };
 
 function createPostStore() {
@@ -94,6 +96,34 @@ function createPostStore() {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
       set({ ...initialState });
+    },
+    loadPost: (post: any) => {
+      let scheduleOption: 'now' | 'schedule' = 'now';
+      let scheduleDate = '';
+      let scheduleTime = '';
+      if (post.scheduled_at) {
+        scheduleOption = 'schedule';
+        const dateObj = new Date(post.scheduled_at);
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        scheduleDate = `${year}-${month}-${day}`;
+        scheduleTime = `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+      }
+      update(s => ({
+        ...s,
+        step: 2,
+        topic: post.topic,
+        postTitle: post.title,
+        postContent: post.content,
+        imageSource: post.image_source || 'none',
+        selectedImageUrl: post.image_url,
+        generatedImageUrl: post.image_source === 'ai' ? post.image_url : null,
+        scheduleOption,
+        scheduleDate,
+        scheduleTime,
+        editingPostId: post.id
+      }));
     },
     setStep: (step: number) => update(s => ({ ...s, step })),
     setTopic: (topic: string) => update(s => ({ ...s, topic })),
@@ -239,7 +269,7 @@ function createPostStore() {
       });
 
       if (!state) return;
-      const { postTitle, topic, postContent, selectedImageUrl, imageSource, scheduleOption, scheduleDate, scheduleTime } = state as PostState;
+      const { postTitle, topic, postContent, selectedImageUrl, imageSource, scheduleOption, scheduleDate, scheduleTime, editingPostId } = state as PostState;
 
       if (!postTitle || !postContent) {
         update(s => ({ ...s, savingPost: false }));
@@ -260,9 +290,14 @@ function createPostStore() {
         scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`).toISOString();
       }
 
+      const url = editingPostId 
+        ? `${API_URL}/api/posts/${editingPostId}`
+        : `${API_URL}/api/posts`;
+      const method = editingPostId ? 'PUT' : 'POST';
+
       try {
-        const res = await fetch(`${API_URL}/api/posts`, {
-          method: 'POST',
+        const res = await fetch(url, {
+          method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: postTitle,

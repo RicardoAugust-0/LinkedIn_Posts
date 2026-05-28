@@ -2,6 +2,9 @@
 <script lang="ts">
   import { ExternalLink, TrendingDown } from '@lucide/svelte';
   import PostPreview from '../PostPreview.svelte';
+  import { createEventDispatcher } from 'svelte';
+
+  const dispatch = createEventDispatcher();
 
   export let selectedPost: any = null;
   export let getPostEngagement: (postId: string, metric: 'likes' | 'comments' | 'shares') => string;
@@ -24,6 +27,20 @@
           <span>Ver no LinkedIn</span>
           <ExternalLink size={11} class="link-icon" />
         </a>
+      {:else if selectedPost.status === 'draft' || selectedPost.status === 'failed'}
+        <button 
+          class="studio-btn studio-btn-secondary"
+          on:click={() => dispatch('edit', selectedPost)}
+        >
+          <span>Editar rascunho</span>
+        </button>
+      {:else if selectedPost.status === 'scheduled'}
+        <button 
+          class="studio-btn studio-btn-secondary"
+          on:click={() => dispatch('edit', selectedPost)}
+        >
+          <span>Editar agendamento</span>
+        </button>
       {/if}
     </div>
 
