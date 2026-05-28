@@ -1,6 +1,6 @@
 <!-- frontend/src/pages/Automation.svelte -->
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { 
     CheckCircle2, AlertCircle
   } from '@lucide/svelte';
@@ -30,6 +30,21 @@
   let successToastMsg = "";
   let showErrorToast = false;
   let errorToastMsg = "";
+
+  // Autosave configurations
+  let settingsLoaded = false;
+  let saveTimeout: any;
+
+  function scheduleAutoSave() {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(async () => {
+      await saveCampaignSettings();
+    }, 1000);
+  }
+
+  $: if (settingsLoaded && (topicSeed !== undefined || quantity !== undefined || cadence !== undefined || windows !== undefined || tone !== undefined)) {
+    scheduleAutoSave();
+  }
 
   const cadenceOptions = [
     { id: 'daily',      label: '1× / dia',      desc: 'Uma publicação por dia' },
@@ -61,6 +76,12 @@
     await fetchPosts();
   });
 
+  onDestroy(() => {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    // Salvar imediatamente ao trocar de aba/destruir o componente
+    saveCampaignSettings();
+  });
+
   async function loadSettings() {
     try {
       const res = await fetch(`${API_URL}/api/settings`);
@@ -72,6 +93,11 @@
         cadence = settings.campaign_cadence || cadence;
         windows = settings.campaign_windows ? settings.campaign_windows.split(',') : windows;
         tone = settings.campaign_tone || tone;
+        
+        // Habilitar o monitoramento de alterações pós-carregamento
+        setTimeout(() => {
+          settingsLoaded = true;
+        }, 100);
       }
     } catch (e) {
       console.error("Erro ao carregar configurações de campanha", e);
