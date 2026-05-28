@@ -1,6 +1,6 @@
 <!-- frontend/src/pages/Automation.svelte -->
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
   import { 
     CheckCircle2, AlertCircle
   } from '@lucide/svelte';
@@ -8,6 +8,9 @@
   import AutomationActiveBanner from '../components/automation/AutomationActiveBanner.svelte';
   import AutomationCampaignForm from '../components/automation/AutomationCampaignForm.svelte';
   import AutomationQueueTable from '../components/automation/AutomationQueueTable.svelte';
+  import { postStore } from '../lib/stores/postStore';
+
+  const dispatch = createEventDispatcher();
 
   // State configurations
   let topicSeed = 'Engenharia de software pragmática: Rust, edge runtimes, liderança técnica.';
@@ -105,6 +108,7 @@
           status: p.status,
           scheduled: p.scheduled_at ? formatDateTime(p.scheduled_at) : formatDateTime(p.created_at),
           imageSource: p.image_source || 'none',
+          imageUrl: p.image_url,
           snippet: p.content
         }));
         
@@ -273,10 +277,23 @@
   }
 
   // Ações de itens individuais da Fila
-  function handleEditPost(event: CustomEvent<any> | any) {
+  async function handleEditPost(event: CustomEvent<any> | any) {
     const detail = event.detail !== undefined ? event.detail : event;
     const { id } = detail;
-    triggerSuccessToast(`Redirecionando para editor manual do post #${id.substring(0, 4)}...`);
+    
+    try {
+      const res = await fetch(`${API_URL}/api/posts/${id}`);
+      if (res.ok) {
+        const post = await res.json();
+        postStore.loadPost(post);
+        dispatch('navigate', 'create');
+      } else {
+        triggerErrorToast("Falha ao carregar publicação para edição.");
+      }
+    } catch (e) {
+      console.error(e);
+      triggerErrorToast("Erro de conexão ao carregar publicação.");
+    }
   }
 
   async function handleRegeneratePost(event: CustomEvent<any> | any) {
@@ -284,7 +301,6 @@
     const { id } = detail;
     triggerSuccessToast("Regenerando texto do post via Gemini...");
     
-    // Obter o post atual para pegar o tópico
     const index = queue.findIndex(p => p.id === id);
     if (index === -1) return;
     
@@ -300,7 +316,7 @@
 
       if (generateRes.ok) {
         const data = await generateRes.json();
-        // Atualizar rascunho com o texto regenerado
+        // Atualizar rascunho com o texto regenerado, preservando a imagem existente
         await fetch(`${API_URL}/api/posts/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -308,8 +324,8 @@
             title: data.title || queue[index].title,
             topic: queue[index].title,
             content: data.content,
-            image_url: null,
-            image_source: 'none',
+            image_url: queue[index].imageUrl,
+            image_source: queue[index].imageSource,
             status: 'draft',
             scheduled_at: null,
             is_automated: true
@@ -325,20 +341,139 @@
     }
   }
 
-  function handleSkipPost(event: CustomEvent<any> | any) {
+  async function handleSkipPost(event: CustomEvent<any> | any) {
     const detail = event.detail !== undefined ? event.detail : event;
     const { id } = detail;
-    triggerSuccessToast(`Post #${id.substring(0, 4)} pulado. Próximo post adiantado.`);
+    
+    try {
+      const res = await fetch(`${API_URL}/api/posts/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        triggerSuccessToast(`Publicação pulada com sucesso.`);
+        await fetchPosts();
+      } else {
+        triggerErrorToast("Falha ao pular publicação.");
+      }
+    } catch (e) {
+      console.error(e);
+      triggerErrorToast("Erro de conexão ao pular publicação.");
+    }
   }
 
-  function handleChangeImage(event: CustomEvent<string> | any) {
+  async function handleChangeImage(event: CustomEvent<string> | any) {
     const id = event.detail !== undefined ? event.detail : event;
-    triggerSuccessToast(`Buscando nova imagem para o post #${id.substring(0, 4)}...`);
+    const index = queue.findIndex(p => p.id === id);
+    if (index === -1) return;
+
+    triggerSuccessToast(`Gerando nova imagem por IA para o post...`);
+    try {
+      // 1. Obter o post completo para manter o texto e outros campos
+      const postRes = await fetch(`${API_URL}/api/posts/${id}`);
+      if (!postRes.ok) throw new Error("Falha ao buscar detalhes do post");
+      const post = await postRes.json();
+
+      // 2. Gerar nova imagem
+      const imgPrompt = `Professional futuristic technology illustration depicting ${post.topic}, 3d render digital art, corporate color palette, clean vector style`;
+      const imageRes = await fetch(`${API_URL}/api/generate/image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: imgPrompt })
+      });
+      
+      if (imageRes.ok) {
+        const imgData = await imageRes.json();
+        
+        // 3. Atualizar post no banco
+        const updateRes = await fetch(`${API_URL}/api/posts/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: post.title,
+            topic: post.topic,
+            content: post.content,
+            image_url: imgData.image_url,
+            image_source: 'ai',
+            status: post.status,
+            scheduled_at: post.scheduled_at,
+            is_automated: true
+          })
+        });
+
+        if (updateRes.ok) {
+          triggerSuccessToast("Imagem atualizada com sucesso!");
+          await fetchPosts();
+        } else {
+          throw new Error("Falha ao salvar nova imagem");
+        }
+      } else {
+        throw new Error("Falha ao gerar nova imagem via IA");
+      }
+    } catch (e: any) {
+      console.error(e);
+      triggerErrorToast(e.message || "Erro ao trocar imagem.");
+    }
   }
 
-  function handleReschedule(event: CustomEvent<string> | any) {
+  async function handleReschedule(event: CustomEvent<string> | any) {
     const id = event.detail !== undefined ? event.detail : event;
-    triggerSuccessToast(`Reagendando post #${id.substring(0, 4)}...`);
+    const index = queue.findIndex(p => p.id === id);
+    if (index === -1) return;
+
+    try {
+      const postRes = await fetch(`${API_URL}/api/posts/${id}`);
+      if (!postRes.ok) throw new Error("Falha ao carregar detalhes");
+      const post = await postRes.json();
+
+      let currentSchedule = "";
+      if (post.scheduled_at) {
+        const date = new Date(post.scheduled_at);
+        currentSchedule = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+      } else {
+        const date = new Date();
+        currentSchedule = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} 09:00`;
+      }
+
+      const input = prompt("Defina a nova data e hora do agendamento (AAAA-MM-DD HH:MM):", currentSchedule);
+      if (input === null) return; // cancelou
+
+      const parts = input.trim().split(' ');
+      if (parts.length !== 2) {
+        alert("Formato inválido! Use o formato: AAAA-MM-DD HH:MM");
+        return;
+      }
+      
+      const newDate = new Date(`${parts[0]}T${parts[1]}`);
+      if (isNaN(newDate.getTime())) {
+        alert("Data ou hora inválida!");
+        return;
+      }
+
+      const updateRes = await fetch(`${API_URL}/api/posts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: post.title,
+          topic: post.topic,
+          content: post.content,
+          image_url: post.image_url,
+          image_source: post.image_source,
+          status: 'scheduled',
+          scheduled_at: newDate.toISOString(),
+          is_automated: true
+        })
+      });
+
+      if (updateRes.ok) {
+        triggerSuccessToast("Publicação reagendada com sucesso!");
+        await fetchPosts();
+      } else {
+        triggerErrorToast("Falha ao salvar agendamento.");
+      }
+    } catch (e) {
+      console.error(e);
+      triggerErrorToast("Erro ao reagendar publicação.");
+    }
   }
 
   async function handleRemovePost(event: CustomEvent<string> | any) {

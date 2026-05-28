@@ -55,7 +55,7 @@
     <button class="icon-btn" title="Pular" on:click|stopPropagation={(e) => dispatch('skip', { id: post.id, event: e })}>
       <SkipForward size={11} />
     </button>
-    <button class="icon-btn" title={expanded ? 'Recolher' : 'Expandir'}>
+    <button class="icon-btn" title={expanded ? 'Recolher' : 'Expandir'} on:click|stopPropagation={() => dispatch('expand', post.id)}>
       {#if expanded}
         <ChevronUp size={11} />
       {:else}
