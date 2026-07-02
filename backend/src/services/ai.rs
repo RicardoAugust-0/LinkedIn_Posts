@@ -88,17 +88,26 @@ struct GoogleSearchItem {
 /// para servir de referência de gancho, ângulo e formato que atraem atenção.
 /// Degrada graciosamente: retorna vazio se as chaves não estiverem configuradas ou em falha.
 async fn fetch_reference_posts(settings: &Settings, topic: &str) -> Vec<String> {
+    info!("Referência: iniciando busca de posts de referência para o tema '{}'.", topic);
+
     let key = match settings.google_search_key.as_ref() {
         Some(k) if !k.trim().is_empty() => k,
-        _ => return Vec::new(),
+        _ => {
+            info!("Referência: chave do Google Custom Search (google_search_key) ausente. Gerando sem referências.");
+            return Vec::new();
+        }
     };
     let cx = match settings.google_search_cx.as_ref() {
         Some(c) if !c.trim().is_empty() => c,
-        _ => return Vec::new(),
+        _ => {
+            info!("Referência: ID do mecanismo (google_search_cx) ausente. Gerando sem referências.");
+            return Vec::new();
+        }
     };
 
     // Prioriza posts reais do LinkedIn sobre o tema (os que o Google rankeia no topo).
     let query = format!("{} site:linkedin.com/posts", topic);
+    info!("Referência: consultando Google Custom Search com a query: '{}'.", query);
 
     let client = reqwest::Client::new();
     let resp = match client
