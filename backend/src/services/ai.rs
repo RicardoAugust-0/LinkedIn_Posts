@@ -3,7 +3,7 @@ use sqlx::SqlitePool;
 use serde::{Deserialize, Serialize};
 use crate::domain::models::Settings;
 use crate::domain::errors::AppError;
-use tracing::{info, error};
+use tracing::{info, warn, error};
 use std::fs;
 use uuid::Uuid;
 
@@ -72,6 +72,86 @@ struct Prediction {
     bytes_base64_encoded: Option<String>,
 }
 
+// Google Custom Search (JSON API) response formats
+#[derive(Debug, Deserialize)]
+struct GoogleSearchResponse {
+    items: Option<Vec<GoogleSearchItem>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GoogleSearchItem {
+    title: Option<String>,
+    snippet: Option<String>,
+}
+
+/// Busca posts/conteúdos populares do LinkedIn sobre o tema via Google Custom Search
+/// para servir de referência de gancho, ângulo e formato que atraem atenção.
+/// Degrada graciosamente: retorna vazio se as chaves não estiverem configuradas ou em falha.
+async fn fetch_reference_posts(settings: &Settings, topic: &str) -> Vec<String> {
+    let key = match settings.google_search_key.as_ref() {
+        Some(k) if !k.trim().is_empty() => k,
+        _ => return Vec::new(),
+    };
+    let cx = match settings.google_search_cx.as_ref() {
+        Some(c) if !c.trim().is_empty() => c,
+        _ => return Vec::new(),
+    };
+
+    // Prioriza posts reais do LinkedIn sobre o tema (os que o Google rankeia no topo).
+    let query = format!("{} site:linkedin.com/posts", topic);
+
+    let client = reqwest::Client::new();
+    let resp = match client
+        .get("https://www.googleapis.com/customsearch/v1")
+        .query(&[
+            ("key", key.as_str()),
+            ("cx", cx.as_str()),
+            ("q", query.as_str()),
+            ("num", "5"),
+        ])
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            warn!("Referência: falha ao chamar Google Custom Search: {}. Gerando sem referências.", e);
+            return Vec::new();
+        }
+    };
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        warn!("Referência: Google Custom Search retornou {} - {}. Gerando sem referências.", status, body);
+        return Vec::new();
+    }
+
+    let search: GoogleSearchResponse = match resp.json().await {
+        Ok(s) => s,
+        Err(e) => {
+            warn!("Referência: erro ao ler JSON do Google Custom Search: {}. Gerando sem referências.", e);
+            return Vec::new();
+        }
+    };
+
+    let refs: Vec<String> = search
+        .items
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|item| {
+            let snippet = item.snippet.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())?;
+            match item.title.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()) {
+                Some(title) => Some(format!("{} — {}", title, snippet)),
+                None => Some(snippet),
+            }
+        })
+        .take(5)
+        .collect();
+
+    info!("Referência: {} exemplos de posts do LinkedIn encontrados para o tema '{}'.", refs.len(), topic);
+    refs
+}
+
 pub async fn generate_text(
     pool: &SqlitePool,
     topic: &str,
@@ -107,7 +187,7 @@ pub async fn generate_text(
         return Ok(TextGenerationResponse { title, content });
     }
 
-    let api_key = settings.gemini_key.ok_or_else(|| AppError::Gemini("Gemini API Key ausente".to_string()))?;
+    let api_key = settings.gemini_key.clone().ok_or_else(|| AppError::Gemini("Gemini API Key ausente".to_string()))?;
     let model = "gemini-2.5-flash"; // Modelo rápido e ótimo para textos
     let url = format!(
         "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
@@ -124,7 +204,8 @@ pub async fn generate_text(
     5. Termine com uma pergunta curta de engajamento e no máximo 3 a 4 hashtags relevantes no final. \
     6. Não use cabeçalhos artificiais (como 'Post:', 'Título:', etc.). Retorne apenas o texto final pronto. \
     7. EVITE REPETIÇÕES: Não use frases de abertura clichês ou repetitivas como 'Recentemente tenho explorado...', 'Nos últimos tempos...', 'No ecossistema de...'. Comece diretamente com uma reflexão, um fato, uma provocação ou um aprendizado prático. \
-    8. NÃO EXAGERE NO PERFIL/BIOGRAFIA: Não liste suas experiências, cargo atual, tempo de carreira ou histórico profissional em todos os posts. O contexto do autor serve APENAS para ajustar o tom de voz, estilo técnico e vocabulário. Não faça autopromoção explícita ou repetida das mesmas informações biográficas.".to_string();
+    8. NÃO EXAGERE NO PERFIL/BIOGRAFIA: Não liste suas experiências, cargo atual, tempo de carreira ou histórico profissional em todos os posts. O contexto do autor serve APENAS para ajustar o tom de voz, estilo técnico e vocabulário. Não faça autopromoção explícita ou repetida das mesmas informações biográficas. \
+    9. GANCHO FORTE NA PRIMEIRA LINHA: O LinkedIn corta o post após ~2 linhas com um botão 'ver mais'. Por isso, a primeira frase é a mais importante e decide se o post terá impressões. Abra com uma frase curta e magnética (uma provocação, um contraste, um número surpreendente ou uma afirmação forte) que dê vontade de clicar em 'ver mais'. Nunca abra com saudação genérica.".to_string();
 
     if let Some(ref context) = settings.user_context {
         if !context.trim().is_empty() {
@@ -135,9 +216,28 @@ pub async fn generate_text(
         }
     }
 
+    // Buscar posts populares do LinkedIn sobre o tema para servir de referência de estilo/gancho.
+    let references = fetch_reference_posts(&settings, topic).await;
+    let reference_block = if references.is_empty() {
+        String::new()
+    } else {
+        let joined = references
+            .iter()
+            .enumerate()
+            .map(|(i, r)| format!("{}. {}", i + 1, r))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!(
+            "\n\nEXEMPLOS DE CONTEÚDO POPULAR DO LINKEDIN SOBRE ESTE TEMA (posts reais que atraíram atenção). \
+            Use-os APENAS como inspiração de gancho, ângulo e formato que engajam — NÃO copie frases literais e \
+            NÃO invente números, estatísticas ou fatos que não estejam listados aqui:\n{}",
+            joined
+        )
+    };
+
     let prompt = match prompt_override {
-        Some(po) if !po.trim().is_empty() => format!("{}\nDiretrizes adicionais: {}\nTópico do post: '{}'", system_instruction, po, topic),
-        _ => format!("{}\nTópico do post: '{}'", system_instruction, topic)
+        Some(po) if !po.trim().is_empty() => format!("{}{}\nDiretrizes adicionais: {}\nTópico do post: '{}'", system_instruction, reference_block, po, topic),
+        _ => format!("{}{}\nTópico do post: '{}'", system_instruction, reference_block, topic)
     };
 
     let body = serde_json::json!({
