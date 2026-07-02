@@ -35,6 +35,8 @@ pub async fn init_db(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
             linkedin_client_secret TEXT,
             linkedin_access_token TEXT,
             linkedin_access_token_expires TEXT,
+            linkedin_refresh_token TEXT,
+            linkedin_refresh_token_expires TEXT,
             pexels_key TEXT,
             user_context TEXT,
             campaign_active BOOLEAN NOT NULL DEFAULT 0,
@@ -50,6 +52,16 @@ pub async fn init_db(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
 
     // Adicionar a coluna pexels_key se ela não existir em bancos existentes
     sqlx::query("ALTER TABLE settings ADD COLUMN pexels_key TEXT;")
+        .execute(&pool)
+        .await
+        .ok();
+
+    // Adicionar colunas do refresh token do LinkedIn em bancos existentes
+    sqlx::query("ALTER TABLE settings ADD COLUMN linkedin_refresh_token TEXT;")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE settings ADD COLUMN linkedin_refresh_token_expires TEXT;")
         .execute(&pool)
         .await
         .ok();

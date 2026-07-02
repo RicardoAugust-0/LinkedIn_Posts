@@ -4,7 +4,7 @@ use tokio::time::{sleep, Duration};
 use chrono::{Utc, DateTime};
 use tracing::{info, warn, error};
 use crate::domain::models::{Post, PostStatus};
-use crate::services::linkedin::{publish_post, get_auth_status, REAUTH_WARNING_DAYS};
+use crate::services::linkedin::{publish_post, get_auth_status, refresh_access_token};
 
 pub async fn start_scheduler(pool: SqlitePool) {
     info!("Iniciando o agendador de posts em background...");
@@ -18,17 +18,32 @@ pub async fn start_scheduler(pool: SqlitePool) {
 
         let now = Utc::now();
 
-        // Aviso de token do LinkedIn perto de expirar (não trava o loop se falhar).
+        // Token do LinkedIn perto de expirar: tenta renovar automaticamente;
+        // só avisa se não houver refresh token disponível (checado no máx 1x/6h).
         if last_token_warning.map_or(true, |t| (now - t).num_hours() >= 6) {
             if let Ok(status) = get_auth_status(&pool).await {
                 if status.reauth_soon {
-                    warn!(
-                        "Agendador: Token do LinkedIn expira em {} dia(s) (limite de aviso: {}). \
-                         Reautentique em Configurações para manter a publicação automática.",
-                        status.days_until_expiry.unwrap_or(0),
-                        REAUTH_WARNING_DAYS
-                    );
-                    last_token_warning = Some(now);
+                    match refresh_access_token(&pool).await {
+                        Ok(true) => {
+                            info!("Agendador: Token do LinkedIn renovado automaticamente antes de expirar.");
+                        }
+                        Ok(false) => {
+                            warn!(
+                                "Agendador: Token do LinkedIn expira em {} dia(s) e não há refresh token disponível. \
+                                 Reautentique em Configurações para manter a publicação automática.",
+                                status.days_until_expiry.unwrap_or(0),
+                            );
+                            last_token_warning = Some(now);
+                        }
+                        Err(e) => {
+                            error!(
+                                "Agendador: Falha ao renovar token do LinkedIn (expira em {} dia(s)): {:?}. \
+                                 Reautentique manualmente se persistir.",
+                                status.days_until_expiry.unwrap_or(0), e
+                            );
+                            last_token_warning = Some(now);
+                        }
+                    }
                 }
             }
         }

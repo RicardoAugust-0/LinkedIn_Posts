@@ -48,6 +48,10 @@ pub struct Settings {
     pub linkedin_client_secret: Option<String>,
     pub linkedin_access_token: Option<String>,
     pub linkedin_access_token_expires: Option<DateTime<Utc>>,
+    #[sqlx(default)]
+    pub linkedin_refresh_token: Option<String>,
+    #[sqlx(default)]
+    pub linkedin_refresh_token_expires: Option<DateTime<Utc>>,
     pub pexels_key: Option<String>,
     pub user_context: Option<String>,
     #[sqlx(default)]

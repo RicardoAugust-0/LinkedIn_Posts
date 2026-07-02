@@ -12,6 +12,12 @@ use tracing::{info, error, warn};
 struct LinkedInTokenResponse {
     access_token: String,
     expires_in: i64,
+    /// Só vem se o app tiver "Programmatic Refresh Tokens" habilitado.
+    #[serde(default)]
+    refresh_token: Option<String>,
+    /// Validade do refresh token em segundos (normalmente ~365 dias).
+    #[serde(default)]
+    refresh_token_expires_in: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -144,22 +150,109 @@ pub async fn handle_callback(
 
     let token_res: LinkedInTokenResponse = resp.json().await?;
     let expires_at = Utc::now() + Duration::seconds(token_res.expires_in);
+    let refresh_expires_at = token_res.refresh_token_expires_in
+        .map(|secs| Utc::now() + Duration::seconds(secs));
 
     sqlx::query(
-        "UPDATE settings SET linkedin_access_token = ?, linkedin_access_token_expires = ? WHERE id = 1"
+        "UPDATE settings SET linkedin_access_token = ?, linkedin_access_token_expires = ?, \
+         linkedin_refresh_token = ?, linkedin_refresh_token_expires = ? WHERE id = 1"
     )
     .bind(&token_res.access_token)
     .bind(expires_at)
+    .bind(&token_res.refresh_token)
+    .bind(refresh_expires_at)
     .execute(pool)
     .await?;
 
-    info!("LinkedIn autenticado com sucesso. Token expira em: {}", expires_at);
+    if token_res.refresh_token.is_some() {
+        info!("LinkedIn autenticado com refresh token. Access token expira em: {}. Renovação automática ativada.", expires_at);
+    } else {
+        info!("LinkedIn autenticado (sem refresh token — app não habilitado para renovação). Token expira em: {}", expires_at);
+    }
     Ok(())
+}
+
+/// Renova o access token usando o refresh token armazenado.
+/// Retorna Ok(true) se renovou, Ok(false) se não há refresh token disponível.
+pub async fn refresh_access_token(pool: &SqlitePool) -> Result<bool, AppError> {
+    let settings = sqlx::query_as::<_, Settings>(
+        "SELECT id, gemini_key, google_search_key, google_search_cx, linkedin_client_id, linkedin_client_secret, linkedin_access_token, linkedin_access_token_expires, linkedin_refresh_token, linkedin_refresh_token_expires, pexels_key, user_context FROM settings WHERE id = 1"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let refresh_token = match settings.linkedin_refresh_token {
+        Some(rt) if !rt.trim().is_empty() => rt,
+        _ => return Ok(false), // App sem refresh token — usa fluxo de reautenticação manual.
+    };
+
+    // Refresh token também expira (~365 dias). Se expirou, não há o que fazer sem reautenticar.
+    if let Some(exp) = settings.linkedin_refresh_token_expires {
+        if exp <= Utc::now() {
+            warn!("Refresh token do LinkedIn expirou. Reautenticação manual necessária.");
+            return Ok(false);
+        }
+    }
+
+    let client_id = settings.linkedin_client_id.ok_or_else(|| AppError::BadRequest("Client ID não configurado".to_string()))?;
+    let client_secret = settings.linkedin_client_secret.ok_or_else(|| AppError::BadRequest("Client Secret não configurado".to_string()))?;
+
+    let client = reqwest::Client::new();
+    let resp = client.post("https://www.linkedin.com/oauth/v2/accessToken")
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", &refresh_token),
+            ("client_id", &client_id),
+            ("client_secret", &client_secret),
+        ])
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let err_body = resp.text().await.unwrap_or_default();
+        error!("Erro ao renovar token do LinkedIn: {}", err_body);
+        return Err(AppError::LinkedIn(format!("Erro ao renovar token: {}", err_body)));
+    }
+
+    let token_res: LinkedInTokenResponse = resp.json().await?;
+    let expires_at = Utc::now() + Duration::seconds(token_res.expires_in);
+    // O LinkedIn pode ou não rotacionar o refresh token; mantemos o antigo se não vier um novo.
+    let new_refresh = token_res.refresh_token.unwrap_or(refresh_token);
+    let refresh_expires_at = token_res.refresh_token_expires_in
+        .map(|secs| Utc::now() + Duration::seconds(secs));
+
+    if let Some(rexp) = refresh_expires_at {
+        sqlx::query(
+            "UPDATE settings SET linkedin_access_token = ?, linkedin_access_token_expires = ?, \
+             linkedin_refresh_token = ?, linkedin_refresh_token_expires = ? WHERE id = 1"
+        )
+        .bind(&token_res.access_token)
+        .bind(expires_at)
+        .bind(&new_refresh)
+        .bind(rexp)
+        .execute(pool)
+        .await?;
+    } else {
+        // Sem nova validade de refresh: preserva a expiração antiga do refresh token.
+        sqlx::query(
+            "UPDATE settings SET linkedin_access_token = ?, linkedin_access_token_expires = ?, \
+             linkedin_refresh_token = ? WHERE id = 1"
+        )
+        .bind(&token_res.access_token)
+        .bind(expires_at)
+        .bind(&new_refresh)
+        .execute(pool)
+        .await?;
+    }
+
+    info!("Access token do LinkedIn renovado automaticamente. Nova expiração: {}", expires_at);
+    Ok(true)
 }
 
 pub async fn disconnect(pool: &SqlitePool) -> Result<(), AppError> {
     sqlx::query(
-        "UPDATE settings SET linkedin_access_token = NULL, linkedin_access_token_expires = NULL WHERE id = 1"
+        "UPDATE settings SET linkedin_access_token = NULL, linkedin_access_token_expires = NULL, \
+         linkedin_refresh_token = NULL, linkedin_refresh_token_expires = NULL WHERE id = 1"
     )
     .execute(pool)
     .await?;
