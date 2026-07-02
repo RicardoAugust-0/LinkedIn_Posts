@@ -1,6 +1,6 @@
 <!-- frontend/src/components/dashboard/DashboardPostDetails.svelte -->
 <script lang="ts">
-  import { ExternalLink, TrendingDown } from '@lucide/svelte';
+  import { ExternalLink, TrendingDown, AlertTriangle } from '@lucide/svelte';
   import PostPreview from '../PostPreview.svelte';
   import { createEventDispatcher } from 'svelte';
 
@@ -43,6 +43,25 @@
         </button>
       {/if}
     </div>
+
+    <!-- Aviso de falha / retry de publicação -->
+    {#if selectedPost.status === 'failed' && selectedPost.error_message}
+      <div class="failure-notice">
+        <AlertTriangle size={14} class="notice-icon" />
+        <div class="notice-body">
+          <strong>Falha ao publicar</strong> (após {selectedPost.retry_count} {selectedPost.retry_count === 1 ? 'tentativa' : 'tentativas'})
+          <span class="notice-detail">{selectedPost.error_message}</span>
+        </div>
+      </div>
+    {:else if selectedPost.status === 'scheduled' && selectedPost.retry_count > 0}
+      <div class="retry-notice">
+        <AlertTriangle size={14} class="notice-icon" />
+        <div class="notice-body">
+          <strong>Reagendado automaticamente</strong> (tentativa {selectedPost.retry_count})
+          {#if selectedPost.error_message}<span class="notice-detail">{selectedPost.error_message}</span>{/if}
+        </div>
+      </div>
+    {/if}
 
     <!-- Dummy Engagement Metrics -->
     <div class="details-metrics-row">
@@ -135,6 +154,56 @@
 
   .details-linkedin-btn :global(.link-icon) {
     color: var(--text-muted);
+  }
+
+  /* Aviso de falha / retry */
+  .failure-notice,
+  .retry-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: var(--radius-lg);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .failure-notice {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: var(--text);
+  }
+
+  .failure-notice :global(.notice-icon) {
+    color: #ef4444;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .retry-notice {
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    color: var(--text);
+  }
+
+  .retry-notice :global(.notice-icon) {
+    color: var(--amber);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .notice-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .notice-detail {
+    color: var(--text-muted);
+    font-size: 11.5px;
+    word-break: break-word;
   }
 
   /* Dummy Metrics */

@@ -3,6 +3,9 @@ use sqlx::SqlitePool;
 use tokio::time::{sleep, Duration};
 use chrono::{Utc, DateTime};
 use tracing::{info, warn, error};
+
+/// Número máximo de tentativas de publicação antes de marcar o post como falho.
+const MAX_PUBLISH_RETRIES: i64 = 3;
 use crate::domain::models::{Post, PostStatus};
 use crate::services::linkedin::{publish_post, get_auth_status, refresh_access_token};
 
@@ -76,20 +79,57 @@ pub async fn start_scheduler(pool: SqlitePool) {
             match publish_post(&pool, &post_record.id).await {
                 Ok(li_id) => {
                     info!("Agendador: Post '{}' publicado com sucesso no LinkedIn. ID Retornado: {}", post_record.title, li_id);
+                    // Limpar qualquer mensagem de erro de tentativas anteriores.
+                    let _ = sqlx::query("UPDATE posts SET error_message = NULL WHERE id = ?")
+                        .bind(&post_record.id)
+                        .execute(&pool)
+                        .await;
                 }
                 Err(err_msg) => {
-                    error!("Agendador: Falha ao publicar post '{}'. Erro: {:?}", post_record.title, err_msg);
-                    // Atualizar status para 'failed' no banco
-                    let update_res = sqlx::query(
-                        "UPDATE posts SET status = ? WHERE id = ?"
-                    )
-                    .bind(PostStatus::Failed)
-                    .bind(&post_record.id)
-                    .execute(&pool)
-                    .await;
-                    
+                    let err_text = format!("{}", err_msg);
+
+                    // Ler o número de tentativas atual e decidir entre reagendar ou desistir.
+                    let current_retry: i64 = sqlx::query_scalar("SELECT retry_count FROM posts WHERE id = ?")
+                        .bind(&post_record.id)
+                        .fetch_one(&pool)
+                        .await
+                        .unwrap_or(0);
+                    let new_retry = current_retry + 1;
+
+                    let update_res = if new_retry >= MAX_PUBLISH_RETRIES {
+                        error!(
+                            "Agendador: Post '{}' falhou definitivamente após {} tentativa(s). Erro: {}",
+                            post_record.title, new_retry, err_text
+                        );
+                        sqlx::query(
+                            "UPDATE posts SET status = ?, retry_count = ?, error_message = ? WHERE id = ?"
+                        )
+                        .bind(PostStatus::Failed)
+                        .bind(new_retry)
+                        .bind(&err_text)
+                        .bind(&post_record.id)
+                        .execute(&pool)
+                        .await
+                    } else {
+                        // Backoff progressivo: reagenda para o futuro (5min * tentativa).
+                        let next_attempt = now + chrono::Duration::minutes(5 * new_retry);
+                        warn!(
+                            "Agendador: Falha ao publicar '{}' (tentativa {}/{}). Reagendado para {}. Erro: {}",
+                            post_record.title, new_retry, MAX_PUBLISH_RETRIES, next_attempt, err_text
+                        );
+                        sqlx::query(
+                            "UPDATE posts SET retry_count = ?, error_message = ?, scheduled_at = ? WHERE id = ?"
+                        )
+                        .bind(new_retry)
+                        .bind(&err_text)
+                        .bind(next_attempt)
+                        .bind(&post_record.id)
+                        .execute(&pool)
+                        .await
+                    };
+
                     if let Err(db_err) = update_res {
-                        error!("Agendador: Erro ao atualizar status do post para falho no banco: {}", db_err);
+                        error!("Agendador: Erro ao atualizar post após falha de publicação no banco: {}", db_err);
                     }
                 }
             }

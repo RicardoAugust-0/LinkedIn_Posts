@@ -118,7 +118,9 @@ pub async fn init_db(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
             published_at TEXT,
             created_at TEXT NOT NULL,
             linkedin_post_id TEXT,
-            is_automated BOOLEAN NOT NULL DEFAULT 0
+            is_automated BOOLEAN NOT NULL DEFAULT 0,
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            error_message TEXT
         );"
     )
     .execute(&pool)
@@ -126,6 +128,16 @@ pub async fn init_db(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
 
     // Adicionar a coluna is_automated em posts se não existir em bancos existentes
     sqlx::query("ALTER TABLE posts ADD COLUMN is_automated BOOLEAN NOT NULL DEFAULT 0;")
+        .execute(&pool)
+        .await
+        .ok();
+
+    // Colunas de robustez de publicação (retry automático + motivo da falha)
+    sqlx::query("ALTER TABLE posts ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0;")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE posts ADD COLUMN error_message TEXT;")
         .execute(&pool)
         .await
         .ok();

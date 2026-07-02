@@ -36,6 +36,10 @@ pub struct Post {
     pub linkedin_post_id: Option<String>,
     #[sqlx(default)]
     pub is_automated: bool,
+    #[sqlx(default)]
+    pub retry_count: i64,
+    #[sqlx(default)]
+    pub error_message: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]

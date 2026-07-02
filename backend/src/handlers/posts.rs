@@ -18,14 +18,14 @@ pub async fn list_posts(
 ) -> Result<Json<Vec<Post>>, AppError> {
     let posts = match query.automated {
         Some(automated) => sqlx::query_as::<_, Post>(
-            "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated \
+            "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated, retry_count, error_message \
              FROM posts WHERE is_automated = ? ORDER BY created_at DESC"
         )
         .bind(automated)
         .fetch_all(&pool)
         .await?,
         None => sqlx::query_as::<_, Post>(
-            "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated \
+            "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated, retry_count, error_message \
              FROM posts ORDER BY created_at DESC"
         )
         .fetch_all(&pool)
@@ -40,7 +40,7 @@ pub async fn get_post(
     State(pool): State<SqlitePool>,
 ) -> Result<Json<Post>, AppError> {
     let post = sqlx::query_as::<_, Post>(
-        "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated FROM posts WHERE id = ?"
+        "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated, retry_count, error_message FROM posts WHERE id = ?"
     )
     .bind(id)
     .fetch_optional(&pool)
@@ -77,7 +77,7 @@ pub async fn create_post(
     info!("Novo post criado no banco: {} (Status: {:?}, Automated: {})", id, req.status, req.is_automated);
 
     let post = sqlx::query_as::<_, Post>(
-        "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated FROM posts WHERE id = ?"
+        "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated, retry_count, error_message FROM posts WHERE id = ?"
     )
     .bind(&id)
     .fetch_one(&pool)
@@ -93,7 +93,7 @@ pub async fn update_post(
 ) -> Result<Json<Post>, AppError> {
     // Verificar se o post existe
     let existing = sqlx::query_as::<_, Post>(
-        "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated FROM posts WHERE id = ?"
+        "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated, retry_count, error_message FROM posts WHERE id = ?"
     )
     .bind(&id)
     .fetch_optional(&pool)
@@ -115,7 +115,9 @@ pub async fn update_post(
             scheduled_at = ?, \
             published_at = ?, \
             linkedin_post_id = ?, \
-            is_automated = ? \
+            is_automated = ?, \
+            retry_count = 0, \
+            error_message = NULL \
          WHERE id = ?"
     )
     .bind(req.title)
@@ -135,7 +137,7 @@ pub async fn update_post(
     info!("Post atualizado no banco: {} (Novo Status: {:?}, Automated: {})", id, req.status, req.is_automated);
 
     let post = sqlx::query_as::<_, Post>(
-        "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated FROM posts WHERE id = ?"
+        "SELECT id, title, topic, content, image_url, image_source, status, scheduled_at, published_at, created_at, linkedin_post_id, is_automated, retry_count, error_message FROM posts WHERE id = ?"
     )
     .bind(&id)
     .fetch_one(&pool)
