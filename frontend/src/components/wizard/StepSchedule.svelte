@@ -1,17 +1,12 @@
 <!-- frontend/src/components/wizard/StepSchedule.svelte -->
 <script lang="ts">
-  import { Calendar, Clock, Send, ArrowLeft, Sparkles } from '@lucide/svelte';
+  import { Calendar, Send, ArrowLeft, Sparkles } from '@lucide/svelte';
   import PostPreview from '../PostPreview.svelte';
+  import BestTimeHeatmap from './BestTimeHeatmap.svelte';
   import { postStore } from '../../lib/stores/postStore';
   import { createEventDispatcher } from 'svelte';
 
   const dispatch = createEventDispatcher();
-
-  const aiSuggestedTimes = [
-    { day: 'Quarta', time: '07:00', tag: 'Pico de tech', best: true },
-    { day: 'Quinta', time: '09:30', tag: 'Alto alcance', best: false },
-    { day: 'Sexta',  time: '12:15', tag: 'Boa retenção', best: false }
-  ];
 
   function selectSuggestedTime(dayText: string, timeStr: string) {
     postStore.setScheduleOption('schedule');
@@ -117,25 +112,14 @@
       <div class="timezone-hint">fuso local: America/Sao_Paulo (UTC-3)</div>
     {/if}
 
-    <!-- AI suggested times -->
+    <!-- Melhores horários (mapa de calor) -->
     <div class="ai-suggested-card">
       <div class="suggested-header">
         <Sparkles size={11} class="spark-icon" />
-        <span><b>Sugestão da IA</b> · com base na atividade do seu público</span>
+        <span><b>Melhores horários</b> · benchmark geral do LinkedIn</span>
       </div>
 
-      <div class="suggested-times-list">
-        {#each aiSuggestedTimes as sugg}
-          <div class="suggested-time-item {sugg.best ? 'best' : ''}">
-            <span class="suggested-time-label">{sugg.day} às {sugg.time}</span>
-            <span class="suggested-time-tag {sugg.best ? 'best-tag' : ''}">{sugg.tag}</span>
-            <div class="flex-spacer"></div>
-            <button class="studio-btn studio-btn-secondary compact-btn use-time-btn" on:click={() => selectSuggestedTime(sugg.day, sugg.time)}>
-              Usar
-            </button>
-          </div>
-        {/each}
-      </div>
+      <BestTimeHeatmap on:select={(e) => selectSuggestedTime(e.detail.day, e.detail.time)} />
     </div>
 
     <div class="flex-spacer"></div>
@@ -347,60 +331,6 @@
 
   :global(.theme-light) .suggested-header :global(.spark-icon) {
     color: var(--text-muted);
-  }
-
-  .suggested-times-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .suggested-time-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 8px;
-    border-radius: 7px;
-    background: transparent;
-    border: 1px solid transparent;
-  }
-
-  .suggested-time-item.best {
-    background: var(--surface);
-    border-color: var(--border);
-  }
-
-  .suggested-time-label {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--text);
-    width: 110px;
-  }
-
-  .suggested-time-tag {
-    font-size: 11px;
-    color: var(--text-muted);
-    padding: 2px 7px;
-    border-radius: 99px;
-    background: var(--bg-app);
-    border: 1px solid var(--border);
-  }
-
-  .suggested-time-tag.best-tag {
-    background: var(--accent-muted);
-    border-color: rgba(163, 230, 53, 0.2);
-    color: var(--accent);
-  }
-
-  :global(.theme-light) .suggested-time-tag.best-tag {
-    background: var(--bg-inset);
-    border-color: var(--border);
-    color: var(--text-muted);
-  }
-
-  .use-time-btn {
-    font-size: 11px;
-    padding: 3px 9px;
   }
 
   /* Live Preview (Step 3 Right) */
