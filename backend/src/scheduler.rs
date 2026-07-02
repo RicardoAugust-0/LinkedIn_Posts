@@ -1,19 +1,37 @@
 // backend/src/scheduler.rs
 use sqlx::SqlitePool;
 use tokio::time::{sleep, Duration};
-use chrono::Utc;
-use tracing::{info, error};
+use chrono::{Utc, DateTime};
+use tracing::{info, warn, error};
 use crate::domain::models::{Post, PostStatus};
-use crate::services::linkedin::publish_post;
+use crate::services::linkedin::{publish_post, get_auth_status, REAUTH_WARNING_DAYS};
 
 pub async fn start_scheduler(pool: SqlitePool) {
     info!("Iniciando o agendador de posts em background...");
-    
+
+    // Última vez que avisamos sobre expiração de token (throttle: no máx 1x/6h).
+    let mut last_token_warning: Option<DateTime<Utc>> = None;
+
     loop {
         // Dormir por 15 segundos antes da próxima checagem
         sleep(Duration::from_secs(15)).await;
-        
+
         let now = Utc::now();
+
+        // Aviso de token do LinkedIn perto de expirar (não trava o loop se falhar).
+        if last_token_warning.map_or(true, |t| (now - t).num_hours() >= 6) {
+            if let Ok(status) = get_auth_status(&pool).await {
+                if status.reauth_soon {
+                    warn!(
+                        "Agendador: Token do LinkedIn expira em {} dia(s) (limite de aviso: {}). \
+                         Reautentique em Configurações para manter a publicação automática.",
+                        status.days_until_expiry.unwrap_or(0),
+                        REAUTH_WARNING_DAYS
+                    );
+                    last_token_warning = Some(now);
+                }
+            }
+        }
         
         // Buscar posts agendados que já passaram da hora de publicação
         let scheduled_posts_res = sqlx::query_as::<_, Post>(

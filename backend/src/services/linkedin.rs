@@ -24,7 +24,14 @@ pub struct AuthStatusResponse {
     pub authenticated: bool,
     pub simulated: bool,
     pub expires_at: Option<chrono::DateTime<Utc>>,
+    /// Dias restantes até o token expirar (None se simulado/sem token).
+    pub days_until_expiry: Option<i64>,
+    /// true quando faltam 7 dias ou menos e é necessário reautenticar.
+    pub reauth_soon: bool,
 }
+
+/// Limite (em dias) a partir do qual avisamos que o token está perto de expirar.
+pub const REAUTH_WARNING_DAYS: i64 = 7;
 
 pub async fn get_auth_status(pool: &SqlitePool) -> Result<AuthStatusResponse, AppError> {
     let settings = sqlx::query_as::<_, Settings>(
@@ -39,10 +46,23 @@ pub async fn get_auth_status(pool: &SqlitePool) -> Result<AuthStatusResponse, Ap
     let is_auth = settings.linkedin_access_token.is_some() && 
         settings.linkedin_access_token_expires.map_or(false, |exp| exp > Utc::now());
 
+    let authenticated = is_auth && !is_mock;
+
+    let days_until_expiry = if authenticated {
+        settings.linkedin_access_token_expires
+            .map(|exp| (exp - Utc::now()).num_days())
+    } else {
+        None
+    };
+
+    let reauth_soon = days_until_expiry.map_or(false, |d| d <= REAUTH_WARNING_DAYS);
+
     Ok(AuthStatusResponse {
-        authenticated: is_auth && !is_mock,
+        authenticated,
         simulated: is_mock,
         expires_at: if is_mock { None } else { settings.linkedin_access_token_expires },
+        days_until_expiry,
+        reauth_soon,
     })
 }
 

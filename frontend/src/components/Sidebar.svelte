@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { LayoutDashboard, Sparkles, Settings, Search, Moon, Sun, Zap } from '@lucide/svelte';
+  import { LayoutDashboard, Sparkles, Settings, Search, Moon, Sun, Zap, AlertTriangle } from '@lucide/svelte';
   import { API_URL } from '../lib/api';
 
   export let activePage: 'dashboard' | 'create' | 'settings' | 'automation' = 'dashboard';
@@ -8,8 +8,14 @@
 
   const dispatch = createEventDispatcher();
 
+  // Faltando esse número de dias (ou menos), mostramos alerta de reautenticação.
+  const REAUTH_WARNING_DAYS = 7;
+
   let isAuthenticated = false;
   let daysRemaining = 28;
+
+  // Alerta quando o token está autenticado mas perto de expirar.
+  $: reauthSoon = isAuthenticated && daysRemaining <= REAUTH_WARNING_DAYS;
 
   onMount(async () => {
     await checkLinkedInStatus();
@@ -100,21 +106,31 @@
   <div class="sidebar-spacer"></div>
 
   <!-- LinkedIn Connection Card -->
-  <div class="connection-card">
+  <div class="connection-card {reauthSoon ? 'warning' : ''}">
     <div class="card-status-row">
-      <span class="status-indicator-dot {isAuthenticated ? 'connected' : 'simulated'}"></span>
-      <span class="status-title">{isAuthenticated ? 'LinkedIn ativo' : 'Modo Simulação'}</span>
+      {#if reauthSoon}
+        <AlertTriangle size={13} class="warn-icon" />
+        <span class="status-title">Reautenticar em breve</span>
+      {:else}
+        <span class="status-indicator-dot {isAuthenticated ? 'connected' : 'simulated'}"></span>
+        <span class="status-title">{isAuthenticated ? 'LinkedIn ativo' : 'Modo Simulação'}</span>
+      {/if}
     </div>
     <div class="card-desc">
-      {#if isAuthenticated}
+      {#if reauthSoon}
+        Token expira em {daysRemaining} {daysRemaining === 1 ? 'dia' : 'dias'}. Reconecte para não parar a publicação automática.
+      {:else if isAuthenticated}
         Token expira em {daysRemaining} dias.
       {:else}
         Rodando localmente em simulação.
       {/if}
     </div>
     <div class="progress-bar-container">
-      <div class="progress-bar-fill {isAuthenticated ? 'connected' : 'simulated'}" style="width: {isAuthenticated ? Math.min(100, (daysRemaining / 60) * 100) : 100}%"></div>
+      <div class="progress-bar-fill {reauthSoon ? 'warning' : (isAuthenticated ? 'connected' : 'simulated')}" style="width: {isAuthenticated ? Math.min(100, (daysRemaining / 60) * 100) : 100}%"></div>
     </div>
+    {#if reauthSoon}
+      <button class="reauth-btn" on:click={() => navigate('settings')}>Reautenticar agora</button>
+    {/if}
   </div>
 
   <!-- User Chip Footer -->
@@ -355,6 +371,38 @@
 
   .progress-bar-fill.simulated {
     background-color: var(--amber);
+  }
+
+  /* Estado de alerta: token perto de expirar */
+  .connection-card.warning {
+    border-color: var(--amber);
+    background: rgba(251, 191, 36, 0.06);
+  }
+
+  .connection-card.warning :global(.warn-icon) {
+    color: var(--amber);
+  }
+
+  .progress-bar-fill.warning {
+    background-color: var(--amber);
+  }
+
+  .reauth-btn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #1a1205;
+    background: var(--amber);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: filter var(--transition-normal);
+  }
+
+  .reauth-btn:hover {
+    filter: brightness(1.08);
   }
 
   /* User Chip */
